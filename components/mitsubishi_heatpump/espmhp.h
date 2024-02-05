@@ -15,12 +15,14 @@
  * - ESPHome 1.19.1 or greater
  */
 
-#define USE_CALLBACKS
+//#define USE_CALLBACKS
 
 #include "esphome.h"
 #include "esphome/components/select/select.h"
 #include "esphome/core/preferences.h"
 #include <chrono>
+
+#include "pidcontroller.h"
 
 #include "HeatPump.h"
 
@@ -41,6 +43,9 @@ static const uint8_t ESPMHP_MAX_TEMPERATURE = 31; // degrees C,
                                                   //defined by hardware
 static const float   ESPMHP_TEMPERATURE_STEP = 0.5; // temperature setting step,
                                                     // in degrees C
+static const float p = 4.0;
+static const float i = 0.02;
+static const float d = 0.2;
 
 class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::climate::Climate {
 
@@ -175,6 +180,7 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         // Retrieve the HardwareSerial pointer from friend and subclasses.
         HardwareSerial *hw_serial_;
         int baud_ = 0;
+
         int rx_pin_ = -1;
         int tx_pin_ = -1;
         bool operating_ = false;
@@ -184,6 +190,13 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         std::optional<std::chrono::duration<long long, std::ratio<60>>> remote_ping_timeout_;
         std::optional<std::chrono::time_point<std::chrono::steady_clock>> last_remote_temperature_sensor_update_;
         std::optional<std::chrono::time_point<std::chrono::steady_clock>> last_ping_request_;
+
+        PIDController *pidController;
+
+        bool same_float(const float left, const float right);
+        void update_setpoint(float value);
+        bool isComponentActive();
+        void run_workflows();
 };
 
 #endif

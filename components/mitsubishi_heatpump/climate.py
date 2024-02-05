@@ -75,8 +75,8 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
         cv.Optional(CONF_TX_PIN): cv.positive_int,
         # If polling interval is greater than 9 seconds, the HeatPump library
         # reconnects, but doesn't then follow up with our data request.
-        cv.Optional(CONF_UPDATE_INTERVAL, default="500ms"): cv.All(
-            cv.update_interval, cv.Range(max=cv.TimePeriod(milliseconds=9000))
+        cv.Optional(CONF_UPDATE_INTERVAL, default="2000ms"): cv.All(
+            cv.update_interval, cv.Range(max=cv.TimePeriod(milliseconds=8500))
         ),
        # Add selects for vertical and horizontal vane positions
        cv.Optional(CONF_HORIZONTAL_SWING_SELECT): SELECT_SCHEMA,
