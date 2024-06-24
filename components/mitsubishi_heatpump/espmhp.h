@@ -196,8 +196,6 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         std::optional<std::chrono::time_point<std::chrono::steady_clock>> last_remote_temperature_sensor_update_;
         std::optional<std::chrono::time_point<std::chrono::steady_clock>> last_ping_request_;
 
-        PIDController *pidController;
-
         bool settingsUpdated = false;
         bool statusUpdated = false;
 
