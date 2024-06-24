@@ -904,18 +904,6 @@ bool MitsubishiHeatPump::isComponentActive() {
     return this->mode != climate::CLIMATE_MODE_OFF;
 }
 
-bool MitsubishiHeatPump::same_float(const float left, const float right) {
-    return fabs(left - right) <= 0.001;
-}
-
-void MitsubishiHeatPump::run_workflows() {
-    ESP_LOGI(TAG, "Run workflows");
-    ESP_LOGI(TAG, "Device active (direct): %s", YESNO(hp->getPowerSettingBool()));
-
-    if (!this->isComponentActive()) {
-        ESP_LOGW(TAG, "Skipping run workflow due to inactive state.");
-        return;
-
 void MitsubishiHeatPump::dump_heat_pump_details() {
     /*
     struct heatpumpStatus {
@@ -987,10 +975,6 @@ void MitsubishiHeatPump::update_setpoint(const float value) {
 
     ESP_LOGI(TAG, "PID Target temp changing from %f to %f", this->pidController->getTarget(), value);
     this->pidController->setTarget(this->target_temperature);
-}
-
-bool MitsubishiHeatPump::isComponentActive() {
-    return this->mode != climate::CLIMATE_MODE_OFF;
 }
 
 void MitsubishiHeatPump::internalTurnOn() {
