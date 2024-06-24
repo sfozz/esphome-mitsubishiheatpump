@@ -78,10 +78,6 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         // Set the TX pin. Must be called before setup() to have any effect.
         void set_tx_pin(int);
 
-        // print the current configuration
-        void dump_config() override;
-
-
         // handle a change in settings as detected by the HeatPump library.
         void hpSettingsChanged();
 
