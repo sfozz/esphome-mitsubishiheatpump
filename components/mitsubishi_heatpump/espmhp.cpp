@@ -763,18 +763,6 @@ void MitsubishiHeatPump::setup() {
     ESP_LOGCONFIG(TAG, "Initializing new HeatPump object.");
     this->hp = new HeatPump();
 
-    auto restore = this->restore_state_();
-    if (restore.has_value()) {
-        restore->apply(this);
-    } else {
-        this->current_temperature = NAN;
-        this->target_temperature = NAN;
-        this->fan_mode = climate::CLIMATE_FAN_OFF;
-        this->swing_mode = climate::CLIMATE_SWING_OFF;
-        this->vertical_swing_state_ = "auto";
-        this->horizontal_swing_state_ = "auto";
-    }
-
 #ifdef USE_CALLBACKS
     hp->setSettingsChangedCallback(
             [this]() {
@@ -843,12 +831,14 @@ void MitsubishiHeatPump::setup() {
 
     auto restore = this->restore_state_();
     if (restore.has_value()) {
-        restore->to_call(this).perform();
+        restore->apply(this);
     } else {
         this->current_temperature = NAN;
         this->target_temperature = NAN;
         this->fan_mode = climate::CLIMATE_FAN_OFF;
         this->swing_mode = climate::CLIMATE_SWING_OFF;
+        this->vertical_swing_state_ = "auto";
+        this->horizontal_swing_state_ = "auto";
     }
 
     this->dump_config();
