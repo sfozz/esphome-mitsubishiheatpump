@@ -895,6 +895,8 @@ bool MitsubishiHeatPump::isComponentActive() {
 }
 
 void MitsubishiHeatPump::dump_heat_pump_details(const devicestate::DeviceState& deviceState) {
+    ESP_LOGI(TAG, "Internal State");
+    ESP_LOGI(TAG, "  active: %s", TRUEFALSE(this->internalPowerOn));
     /*
     struct DeviceState {
         bool active;
