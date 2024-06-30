@@ -18,6 +18,7 @@
 #define USE_CALLBACKS
 
 #include "esphome.h"
+#include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/select/select.h"
 #include "esphome/core/preferences.h"
 #include <chrono>
@@ -66,7 +67,8 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
             uint32_t poll_interval=ESPMHP_POLL_INTERVAL_DEFAULT
         );
 
-        esphome::BinarySensor* internalPowerOn_sensor = new esphome::BinarySensor();
+        esphome::binary_sensor::BinarySensor* internal_power_on;
+        esphome::binary_sensor::BinarySensor* device_state_active;
 
         // Print a banner with library information.
         void banner();

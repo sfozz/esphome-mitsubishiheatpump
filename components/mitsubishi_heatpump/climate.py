@@ -1,9 +1,12 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import climate, select
+from esphome.components import binary_sensor, climate, select
+
 from esphome.components.logger import HARDWARE_UART_TO_SERIAL
 from esphome.const import (
     CONF_ID,
+    CONF_NAME,
+    CONF_INTERNAL,
     CONF_HARDWARE_UART,
     CONF_BAUD_RATE,
     CONF_RX_PIN,
@@ -16,9 +19,11 @@ from esphome.const import (
 )
 from esphome.core import CORE, coroutine
 
-AUTO_LOAD = ["climate", "select"]
+AUTO_LOAD = ["climate", "select", "binary_sensor"]
 
 CONF_SUPPORTS = "supports"
+CONF_INTERNAL_POWER_ON = "internal_power_on"
+CONF_DEVICE_STATE_ACTIVE = "device_state_active"
 CONF_HORIZONTAL_SWING_SELECT = "horizontal_vane_select"
 CONF_VERTICAL_SWING_SELECT = "vertical_vane_select"
 DEFAULT_CLIMATE_MODES = ["HEAT_COOL", "COOL", "HEAT", "DRY", "FAN_ONLY"]
@@ -48,6 +53,14 @@ MitsubishiACSelect = cg.global_ns.class_(
     "MitsubishiACSelect", select.Select, cg.Component
 )
 
+InternalPowerOn = cg.global_ns.class_(
+    "InternalPowerOn", binary_sensor.BinarySensor, cg.Component
+)
+
+DeviceStateActive = cg.global_ns.class_(
+    "DeviceStateActive", binary_sensor.BinarySensor, cg.Component
+)
+
 def valid_uart(uart):
     if CORE.is_esp8266:
         uarts = ["UART0"]  # UART1 is tx-only
@@ -62,6 +75,27 @@ def valid_uart(uart):
 SELECT_SCHEMA = select.SELECT_SCHEMA.extend(
     {cv.GenerateID(CONF_ID): cv.declare_id(MitsubishiACSelect)}
 )
+
+INTERNAL_POWER_ON_SCHEMA = binary_sensor.binary_sensor_schema(binary_sensor.BinarySensor,
+    entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
+)
+
+DEVICE_STATE_ACTIVE_SCHEMA = binary_sensor.binary_sensor_schema(binary_sensor.BinarySensor,
+    entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
+)
+
+INTERNAL_POWER_ON_DEFAULT = INTERNAL_POWER_ON_SCHEMA({
+    CONF_ID: "internal_power_on",
+    CONF_NAME: "Internal power on"
+})
+
+DEVICE_STATE_ACTIVE_DEFAULT = DEVICE_STATE_ACTIVE_SCHEMA({
+    CONF_ID: "device_state_active",
+    CONF_NAME: "Device state active"
+})
+
+INTERNAL_POWER_ON_DEFAULT[CONF_INTERNAL] = False
+DEVICE_STATE_ACTIVE_DEFAULT[CONF_INTERNAL] = False
 
 CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
     {
@@ -78,9 +112,12 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
         cv.Optional(CONF_UPDATE_INTERVAL, default="2000ms"): cv.All(
             cv.update_interval, cv.Range(max=cv.TimePeriod(milliseconds=8500))
         ),
-       # Add selects for vertical and horizontal vane positions
-       cv.Optional(CONF_HORIZONTAL_SWING_SELECT): SELECT_SCHEMA,
-       cv.Optional(CONF_VERTICAL_SWING_SELECT): SELECT_SCHEMA,
+        # Add selects for vertical and horizontal vane positions
+        cv.Optional(CONF_HORIZONTAL_SWING_SELECT): SELECT_SCHEMA,
+        cv.Optional(CONF_VERTICAL_SWING_SELECT): SELECT_SCHEMA,
+        cv.Optional(CONF_INTERNAL_POWER_ON, default=INTERNAL_POWER_ON_DEFAULT): INTERNAL_POWER_ON_SCHEMA,
+        cv.Optional(CONF_DEVICE_STATE_ACTIVE, default=DEVICE_STATE_ACTIVE_DEFAULT): DEVICE_STATE_ACTIVE_SCHEMA,
+        
         # Optionally override the supported ClimateTraits.
         cv.Optional(CONF_SUPPORTS, default={}): cv.Schema(
             {
@@ -150,6 +187,8 @@ def to_code(config):
 
     yield cg.register_component(var, config)
     yield climate.register_climate(var, config)
+    yield binary_sensor.register_binary_sensor(var.internal_power_on, config[CONF_INTERNAL_POWER_ON])
+    yield binary_sensor.register_binary_sensor(var.device_state_active, config[CONF_DEVICE_STATE_ACTIVE])
     cg.add_library(
         name="HeatPump",
         repository="https://github.com/SwiCago/HeatPump#5d1e146771d2f458907a855bf9d5d4b9bf5ff033",
