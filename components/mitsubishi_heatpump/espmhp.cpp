@@ -473,9 +473,14 @@ void MitsubishiHeatPump::hpSettingsChanged() {
     device_state_active->publish_state(deviceState.active);
     if (this->internalPowerOn != deviceState.active) {
         ESP_LOGI(TAG, "Device active on change: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->internalPowerOn));
+        if (!this->initializedState) {
+            ESP_LOGW(TAG, "Initializing internalPowerOn state from %s to %s", ONOFF(this->internalPowerOn), ONOFF(deviceState.active));
+            this->internalPowerOn = deviceState.active;
+            internal_power_on->publish_state(this->internalPowerOn);
+            this->initializedState = true;
+        }
     }
-    // this->internalPowerOn = isDeviceOn; // Sync the internal state regardless of current value
-    
+
     // We cannot use the internal state of the device initialize component state
     if (this->isComponentActive()) {
         switch (deviceState.mode) {
@@ -1060,12 +1065,6 @@ void MitsubishiHeatPump::run_workflows() {
     device_state_active->publish_state(deviceState.active);
     ESP_LOGI(TAG, "Device active on workflow: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->internalPowerOn));
     if (deviceState.active != this->internalPowerOn) {
-        if (!this->initializedState) {
-            ESP_LOGW(TAG, "Initializing internalPowerOn state from %s to %s", ONOFF(this->internalPowerOn), ONOFF(deviceState.active));
-            this->internalPowerOn = deviceState.active;
-            internal_power_on->publish_state(this->internalPowerOn);
-            this->initializedState = true;
-        }
         this->dump_heat_pump_details(deviceState);
     }
     switch(this->action) {
