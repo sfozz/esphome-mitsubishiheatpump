@@ -903,11 +903,11 @@ void MitsubishiHeatPump::dump_heat_pump_details() {
         int compressorFrequency;
     };
     */
-   ESP_LOGI(TAG, "Heatpump Status: %s", YESNO(this->statusUpdated));
+    ESP_LOGI(TAG, "Heatpump Status: %s", YESNO(this->statusUpdated));
     if (this->statusUpdated) {
         heatpumpStatus currentStatus = hp->getStatus();
         ESP_LOGI(TAG, "  roomTemperature: %f", currentStatus.roomTemperature);
-        ESP_LOGI(TAG, "  operating: ", ONOFF(currentStatus.operating));
+        ESP_LOGI(TAG, "  operating: %f", ONOFF(currentStatus.operating));
         ESP_LOGI(TAG, "  compressorFrequency: %f", currentStatus.compressorFrequency);
     }
 
