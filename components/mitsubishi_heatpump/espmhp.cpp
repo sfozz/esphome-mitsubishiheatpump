@@ -894,7 +894,7 @@ bool MitsubishiHeatPump::isComponentActive() {
     return this->mode != climate::CLIMATE_MODE_OFF;
 }
 
-void MitsubishiHeatPump::dump_heat_pump_details(devicestate::DeviceState& deviceState) {
+void MitsubishiHeatPump::dump_heat_pump_details(const devicestate::DeviceState& deviceState) {
     /*
     struct DeviceState {
         bool active;
@@ -1045,7 +1045,7 @@ void MitsubishiHeatPump::run_workflows() {
     const DeviceState deviceState = devicestate::toDeviceState(&currentSettings);
     ESP_LOGI(TAG, "Device active on workflow: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->internalPowerOn));
     if (deviceState.active != this->internalPowerOn) {
-        this->dump_heat_pump_details(&deviceState);
+        this->dump_heat_pump_details(deviceState);
     }
     switch(this->action) {
         case climate::CLIMATE_ACTION_HEATING: {

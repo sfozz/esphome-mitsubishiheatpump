@@ -99,7 +99,7 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         // print the current configuration
         void dump_config() override;
 
-        void dump_heat_pump_details(devicestate::DeviceState& deviceState);
+        void dump_heat_pump_details(const devicestate::DeviceState& deviceState);
 
         // Debugging function to print the object's state.
         void dump_state();
