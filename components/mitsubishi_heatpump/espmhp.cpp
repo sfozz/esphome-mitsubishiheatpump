@@ -1046,7 +1046,8 @@ void MitsubishiHeatPump::run_workflows() {
     ESP_LOGI(TAG, "Device active on workflow: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->internalPowerOn));
     if (deviceState.active != this->internalPowerOn) {
         if (!this->initializedState) {
-            this->internalPowerOn = deviceState.active
+            ESP_LOGW(TAG, "Initializing internalPowerOn state from %s to %s", ONOFF(this->internalPowerOn), ONOFF(deviceState.active));
+            this->internalPowerOn = deviceState.active;
             this->initializedState = true;
         }
         this->dump_heat_pump_details(deviceState);
