@@ -24,6 +24,7 @@ AUTO_LOAD = ["climate", "select", "binary_sensor"]
 CONF_SUPPORTS = "supports"
 CONF_INTERNAL_POWER_ON = "internal_power_on"
 CONF_DEVICE_STATE_ACTIVE = "device_state_active"
+CONF_DEVICE_STATUS_OPERATING = "device_status_operating"
 CONF_HORIZONTAL_SWING_SELECT = "horizontal_vane_select"
 CONF_VERTICAL_SWING_SELECT = "vertical_vane_select"
 DEFAULT_CLIMATE_MODES = ["HEAT_COOL", "COOL", "HEAT", "DRY", "FAN_ONLY"]
@@ -61,6 +62,10 @@ DeviceStateActive = cg.global_ns.class_(
     "DeviceStateActive", binary_sensor.BinarySensor, cg.Component
 )
 
+DeviceStatusOperating = cg.global_ns.class_(
+    "DeviceStatusOperating", binary_sensor.BinarySensor, cg.Component
+)
+
 def valid_uart(uart):
     if CORE.is_esp8266:
         uarts = ["UART0"]  # UART1 is tx-only
@@ -84,6 +89,10 @@ DEVICE_STATE_ACTIVE_SCHEMA = binary_sensor.binary_sensor_schema(binary_sensor.Bi
     entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
 )
 
+DEVICE_STATUS_OPERATING_SCHEMA = binary_sensor.binary_sensor_schema(binary_sensor.BinarySensor,
+    entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
+)
+
 INTERNAL_POWER_ON_DEFAULT = INTERNAL_POWER_ON_SCHEMA({
     CONF_ID: "internal_power_on",
     CONF_NAME: "Internal power on"
@@ -94,8 +103,14 @@ DEVICE_STATE_ACTIVE_DEFAULT = DEVICE_STATE_ACTIVE_SCHEMA({
     CONF_NAME: "Device state active"
 })
 
+DEVICE_STATUS_OPERATING_DEFAULT = DEVICE_STATUS_OPERATING_SCHEMA({
+    CONF_ID: "device_status_operating",
+    CONF_NAME: "Device status operating"
+})
+
 INTERNAL_POWER_ON_DEFAULT[CONF_INTERNAL] = False
 DEVICE_STATE_ACTIVE_DEFAULT[CONF_INTERNAL] = False
+DEVICE_STATUS_OPERATING_DEFAULT[CONF_INTERNAL] = False
 
 CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
     {
@@ -117,6 +132,7 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
         cv.Optional(CONF_VERTICAL_SWING_SELECT): SELECT_SCHEMA,
         cv.Optional(CONF_INTERNAL_POWER_ON, default=INTERNAL_POWER_ON_DEFAULT): INTERNAL_POWER_ON_SCHEMA,
         cv.Optional(CONF_DEVICE_STATE_ACTIVE, default=DEVICE_STATE_ACTIVE_DEFAULT): DEVICE_STATE_ACTIVE_SCHEMA,
+        cv.Optional(CONF_DEVICE_STATUS_OPERATING, default=DEVICE_STATUS_OPERATING_DEFAULT): DEVICE_STATUS_OPERATING_SCHEMA,
         
         # Optionally override the supported ClimateTraits.
         cv.Optional(CONF_SUPPORTS, default={}): cv.Schema(
@@ -189,6 +205,7 @@ def to_code(config):
     yield climate.register_climate(var, config)
     yield binary_sensor.register_binary_sensor(var.internal_power_on, config[CONF_INTERNAL_POWER_ON])
     yield binary_sensor.register_binary_sensor(var.device_state_active, config[CONF_DEVICE_STATE_ACTIVE])
+    yield binary_sensor.register_binary_sensor(var.device_status_operating, config[CONF_DEVICE_STATUS_OPERATING])
     cg.add_library(
         name="HeatPump",
         repository="https://github.com/SwiCago/HeatPump#5d1e146771d2f458907a855bf9d5d4b9bf5ff033",

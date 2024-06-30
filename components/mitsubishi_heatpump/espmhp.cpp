@@ -40,6 +40,7 @@ MitsubishiHeatPump::MitsubishiHeatPump(
 {
     internal_power_on = new esphome::binary_sensor::BinarySensor();
     device_state_active = new esphome::binary_sensor::BinarySensor();
+    device_status_operating = new esphome::binary_sensor::BinarySensor();
 
     this->traits_.set_supports_action(true);
     this->traits_.set_supports_current_temperature(true);
@@ -469,7 +470,7 @@ void MitsubishiHeatPump::hpSettingsChanged() {
      * const char* MODE_MAP[5]        = {"HEAT", "DRY", "COOL", "FAN", "AUTO"};
      */
     const DeviceState deviceState = devicestate::toDeviceState(&currentSettings);
-    device_state_active->pushlish_state(deviceState.active)
+    device_state_active->publish_state(deviceState.active);
     if (this->internalPowerOn != deviceState.active) {
         ESP_LOGI(TAG, "Device active on change: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->internalPowerOn));
     }
@@ -628,6 +629,7 @@ void MitsubishiHeatPump::hpSettingsChanged() {
  */
 void MitsubishiHeatPump::hpStatusChanged(heatpumpStatus currentStatus) {
     this->statusUpdated = true;
+    device_status_operating->publish_state(currentStatus.operating);
 
     this->current_temperature = currentStatus.roomTemperature;
     switch (this->mode) {
@@ -1055,7 +1057,7 @@ void MitsubishiHeatPump::run_workflows() {
 
     heatpumpSettings currentSettings = hp->getSettings();
     const DeviceState deviceState = devicestate::toDeviceState(&currentSettings);
-    device_state_active->pushlish_state(deviceState.active)
+    device_state_active->publish_state(deviceState.active);
     ESP_LOGI(TAG, "Device active on workflow: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->internalPowerOn));
     if (deviceState.active != this->internalPowerOn) {
         if (!this->initializedState) {

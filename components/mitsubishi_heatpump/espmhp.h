@@ -69,6 +69,7 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
 
         esphome::binary_sensor::BinarySensor* internal_power_on;
         esphome::binary_sensor::BinarySensor* device_state_active;
+        esphome::binary_sensor::BinarySensor* device_status_operating;
 
         // Print a banner with library information.
         void banner();
