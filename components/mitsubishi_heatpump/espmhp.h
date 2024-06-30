@@ -66,6 +66,8 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
             uint32_t poll_interval=ESPMHP_POLL_INTERVAL_DEFAULT
         );
 
+        esphome::binary_sensor::BinarySensor* internalPowerOn_sensor = new BinarySensor();
+
         // Print a banner with library information.
         void banner();
 
@@ -211,7 +213,6 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
        
         uint32_t lastInternalPowerUpdate = esphome::millis();
         bool internalPowerOn = false;
-        esphome::binary_sensor::BinarySensor* internalPowerOn_ = new BinarySensor();
         bool initializedState = false;
         void internalTurnOn();
         void internalTurnOff();
