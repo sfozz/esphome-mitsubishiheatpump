@@ -904,7 +904,7 @@ void MitsubishiHeatPump::dump_heat_pump_details(const devicestate::DeviceState& 
     */
     ESP_LOGI(TAG, "Device State");
     ESP_LOGI(TAG, "  active: %s", TRUEFALSE(deviceState.active));
-    ESP_LOGI(TAG, "  mode: %d", deviceState.mode);
+    ESP_LOGI(TAG, "  mode: unknown"); // , deviceState.mode
     ESP_LOGI(TAG, "  targetTemperature: %f", deviceState.targetTemperature);
     /*
     struct heatpumpStatus {
