@@ -894,7 +894,7 @@ bool MitsubishiHeatPump::isComponentActive() {
     return this->mode != climate::CLIMATE_MODE_OFF;
 }
 
-void MitsubishiHeatPump::dump_heat_pump_details(const devicestate::DeviceState *deviceState) {
+void MitsubishiHeatPump::dump_heat_pump_details(devicestate::DeviceState& deviceState) {
     /*
     struct DeviceState {
         bool active;
