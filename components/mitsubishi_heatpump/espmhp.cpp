@@ -907,7 +907,7 @@ void MitsubishiHeatPump::dump_heat_pump_details() {
     if (this->statusUpdated) {
         heatpumpStatus currentStatus = hp->getStatus();
         ESP_LOGI(TAG, "  roomTemperature: %f", currentStatus.roomTemperature);
-        ESP_LOGI(TAG, "  operating: %f", ONOFF(currentStatus.operating));
+        ESP_LOGI(TAG, "  operating: %s", TRUEFALSE(currentStatus.operating));
         ESP_LOGI(TAG, "  compressorFrequency: %f", currentStatus.compressorFrequency);
     }
 
@@ -933,7 +933,7 @@ void MitsubishiHeatPump::dump_heat_pump_details() {
         ESP_LOGI(TAG, "  fan: %s", currentSettings.fan);
         ESP_LOGI(TAG, "  vane: %s", currentSettings.vane);
         ESP_LOGI(TAG, "  wideVane: %s", currentSettings.wideVane);
-        ESP_LOGI(TAG, "  connected: %s", YESNO(currentSettings.connected));
+        ESP_LOGI(TAG, "  connected: %s", TRUEFALSE(currentSettings.connected));
     }
 
     /*
