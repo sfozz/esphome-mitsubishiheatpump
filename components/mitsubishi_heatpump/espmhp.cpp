@@ -90,8 +90,6 @@ void MitsubishiHeatPump::update() {
 #endif
     this->enforce_remote_temperature_sensor_timeout();
     this->run_workflows();
-
-    this->run_workflows();
 }
 
 void MitsubishiHeatPump::set_baud_rate(int baud) {
@@ -841,13 +839,6 @@ void MitsubishiHeatPump::setup() {
         this->horizontal_swing_state_ = "auto";
     }
 
-    heatpumpSettings currentSettings = hp->getSettings();
-    const DeviceState deviceState = devicestate::toDeviceState(&currentSettings);
-    ESP_LOGI(TAG, "[SETUP] Device active on workflow: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->internalPowerOn));
-    if (deviceState.active != this->internalPowerOn) {
-        this->dump_heat_pump_details(deviceState);
-    }
-
     this->dump_config();
 }
 
@@ -1054,6 +1045,10 @@ void MitsubishiHeatPump::run_workflows() {
     const DeviceState deviceState = devicestate::toDeviceState(&currentSettings);
     ESP_LOGI(TAG, "Device active on workflow: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->internalPowerOn));
     if (deviceState.active != this->internalPowerOn) {
+        if (!this->initializedState) {
+            this->internalPowerOn = deviceState.active
+            this->initializedState = true;
+        }
         this->dump_heat_pump_details(deviceState);
     }
     switch(this->action) {

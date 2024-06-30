@@ -211,6 +211,7 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
        
         uint32_t lastInternalPowerUpdate = esphome::millis();
         bool internalPowerOn = false;
+        bool initializedState = false;
         void internalTurnOn();
         void internalTurnOff();
 };
