@@ -856,6 +856,8 @@ void MitsubishiHeatPump::setup() {
         this->horizontal_swing_state_ = "auto";
     }
 
+    internal_power_on->publish_state(this->internalPowerOn);
+
     this->dump_config();
 }
 
