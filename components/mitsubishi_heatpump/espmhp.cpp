@@ -841,6 +841,13 @@ void MitsubishiHeatPump::setup() {
         this->horizontal_swing_state_ = "auto";
     }
 
+    heatpumpSettings currentSettings = hp->getSettings();
+    const DeviceState deviceState = devicestate::toDeviceState(&currentSettings);
+    ESP_LOGI(TAG, "[SETUP] Device active on workflow: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->internalPowerOn));
+    if (deviceState.active != this->internalPowerOn) {
+        this->dump_heat_pump_details(deviceState);
+    }
+
     this->dump_config();
 }
 
