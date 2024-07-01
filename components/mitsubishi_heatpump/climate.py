@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, climate, select
+from esphome.components import binary_sensor, climate, select, sensor
 
 from esphome.components.logger import HARDWARE_UART_TO_SERIAL
 from esphome.const import (
@@ -25,6 +25,8 @@ CONF_SUPPORTS = "supports"
 CONF_INTERNAL_POWER_ON = "internal_power_on"
 CONF_DEVICE_STATE_ACTIVE = "device_state_active"
 CONF_DEVICE_STATUS_OPERATING = "device_status_operating"
+CONF_DEVICE_STATE_INITIALIZED = "device_state_initialized"
+CONF_PID_SET_POINT_CORRECTION = "pid_set_point_correction"
 CONF_HORIZONTAL_SWING_SELECT = "horizontal_vane_select"
 CONF_VERTICAL_SWING_SELECT = "vertical_vane_select"
 DEFAULT_CLIMATE_MODES = ["HEAT_COOL", "COOL", "HEAT", "DRY", "FAN_ONLY"]
@@ -62,8 +64,16 @@ DeviceStateActive = cg.global_ns.class_(
     "DeviceStateActive", binary_sensor.BinarySensor, cg.Component
 )
 
+DeviceStateInitialized = cg.global_ns.class_(
+    "DeviceStateInitialized", binary_sensor.BinarySensor, cg.Component
+)
+
 DeviceStatusOperating = cg.global_ns.class_(
     "DeviceStatusOperating", binary_sensor.BinarySensor, cg.Component
+)
+
+PIDSetPointCorrection = cg.global_ns.class_(
+    "PIDSetPointCorrection", sensor.Sensor, cg.Component
 )
 
 def valid_uart(uart):
@@ -89,7 +99,15 @@ DEVICE_STATE_ACTIVE_SCHEMA = binary_sensor.binary_sensor_schema(binary_sensor.Bi
     entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
 )
 
+DEVICE_STATE_INITIALIZED_SCHEMA = binary_sensor.binary_sensor_schema(binary_sensor.BinarySensor,
+    entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
+)
+
 DEVICE_STATUS_OPERATING_SCHEMA = binary_sensor.binary_sensor_schema(binary_sensor.BinarySensor,
+    entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
+)
+
+PID_SETPOINT_CORRECTION_SCHEMA = sensor.sensor_schema(sensor.Sensor,
     entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
 )
 
@@ -103,14 +121,26 @@ DEVICE_STATE_ACTIVE_DEFAULT = DEVICE_STATE_ACTIVE_SCHEMA({
     CONF_NAME: "Device state active"
 })
 
+DEVICE_STATE_INITIALIZED_DEFAULT = DEVICE_STATE_INITIALIZED_SCHEMA({
+    CONF_ID: "device_state_initialized",
+    CONF_NAME: "Device state initialized"
+})
+
 DEVICE_STATUS_OPERATING_DEFAULT = DEVICE_STATUS_OPERATING_SCHEMA({
     CONF_ID: "device_status_operating",
     CONF_NAME: "Device status operating"
 })
 
+PID_SET_POINT_CORRECTION_DEFAULT = PID_SETPOINT_CORRECTION_SCHEMA({
+    CONF_ID: "pid_set_point_correction",
+    CONF_NAME: "PID Set Point Correction"
+})
+
 INTERNAL_POWER_ON_DEFAULT[CONF_INTERNAL] = False
 DEVICE_STATE_ACTIVE_DEFAULT[CONF_INTERNAL] = False
+DEVICE_STATE_INITIALIZED_DEFAULT[CONF_INTERNAL] = False
 DEVICE_STATUS_OPERATING_DEFAULT[CONF_INTERNAL] = False
+PID_SET_POINT_CORRECTION_DEFAULT[CONF_INTERNAL] = False
 
 CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
     {
@@ -132,8 +162,10 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
         cv.Optional(CONF_VERTICAL_SWING_SELECT): SELECT_SCHEMA,
         cv.Optional(CONF_INTERNAL_POWER_ON, default=INTERNAL_POWER_ON_DEFAULT): INTERNAL_POWER_ON_SCHEMA,
         cv.Optional(CONF_DEVICE_STATE_ACTIVE, default=DEVICE_STATE_ACTIVE_DEFAULT): DEVICE_STATE_ACTIVE_SCHEMA,
+        cv.Optional(CONF_DEVICE_STATE_INITIALIZED, default=DEVICE_STATE_INITIALIZED_DEFAULT): DEVICE_STATE_INITIALIZED_SCHEMA,
         cv.Optional(CONF_DEVICE_STATUS_OPERATING, default=DEVICE_STATUS_OPERATING_DEFAULT): DEVICE_STATUS_OPERATING_SCHEMA,
-        
+        cv.Optional(CONF_PID_SET_POINT_CORRECTION, default=PID_SET_POINT_CORRECTION_DEFAULT): PID_SETPOINT_CORRECTION_SCHEMA,
+
         # Optionally override the supported ClimateTraits.
         cv.Optional(CONF_SUPPORTS, default={}): cv.Schema(
             {
@@ -205,7 +237,10 @@ def to_code(config):
     yield climate.register_climate(var, config)
     yield binary_sensor.register_binary_sensor(var.internal_power_on, config[CONF_INTERNAL_POWER_ON])
     yield binary_sensor.register_binary_sensor(var.device_state_active, config[CONF_DEVICE_STATE_ACTIVE])
+    yield binary_sensor.register_binary_sensor(var.device_state_initialized, config[CONF_DEVICE_STATE_INITIALIZED])
     yield binary_sensor.register_binary_sensor(var.device_status_operating, config[CONF_DEVICE_STATUS_OPERATING])
+    yield sensor.register_sensor(var.pid_set_point_correction, config[CONF_PID_SET_POINT_CORRECTION])
+
     cg.add_library(
         name="HeatPump",
         repository="https://github.com/SwiCago/HeatPump#5d1e146771d2f458907a855bf9d5d4b9bf5ff033",

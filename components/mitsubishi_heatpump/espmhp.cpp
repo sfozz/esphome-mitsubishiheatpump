@@ -40,7 +40,9 @@ MitsubishiHeatPump::MitsubishiHeatPump(
 {
     internal_power_on = new esphome::binary_sensor::BinarySensor();
     device_state_active = new esphome::binary_sensor::BinarySensor();
+    device_state_initialized = new esphome::binary_sensor::BinarySensor();
     device_status_operating = new esphome::binary_sensor::BinarySensor();
+    pid_set_point_correction = new esphome::sensor::Sensor();
 
     this->traits_.set_supports_action(true);
     this->traits_.set_supports_current_temperature(true);
@@ -471,15 +473,21 @@ void MitsubishiHeatPump::hpSettingsChanged() {
      */
     const DeviceState deviceState = devicestate::toDeviceState(&currentSettings);
     device_state_active->publish_state(deviceState.active);
-    if (this->internalPowerOn != deviceState.active) {
-        ESP_LOGI(TAG, "Device active on change: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->internalPowerOn));
-        if (!this->initializedState) {
+    if (this->initializedState) {
+        if (this->internalPowerOn != deviceState.active) {
+            ESP_LOGI(TAG, "Device active on change: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->internalPowerOn));
+        }
+    } else {
+        if (this->internalPowerOn != deviceState.active) {
             ESP_LOGW(TAG, "Initializing internalPowerOn state from %s to %s", ONOFF(this->internalPowerOn), ONOFF(deviceState.active));
             this->internalPowerOn = deviceState.active;
-            internal_power_on->publish_state(this->internalPowerOn);
-            this->initializedState = true;
         }
+        internal_power_on->publish_state(this->internalPowerOn);
+
+        this->initializedState = true;
+        device_state_initialized->publish_state(this->initializedState);
     }
+    
 
     // We cannot use the internal state of the device initialize component state
     if (this->isComponentActive()) {
@@ -857,6 +865,7 @@ void MitsubishiHeatPump::setup() {
     }
 
     internal_power_on->publish_state(this->internalPowerOn);
+    device_state_initialized->publish_state(this->initializedState);
 
     this->dump_config();
 }
@@ -1060,6 +1069,7 @@ void MitsubishiHeatPump::run_workflows() {
     }
 
     const float setPointCorrection = this->pidController->update(this->current_temperature);
+    pid_set_point_correct->publish_state(setPointCorrection);
     ESP_LOGI(TAG, "PIDController set point correction: %.1f", setPointCorrection);
 
     heatpumpSettings currentSettings = hp->getSettings();

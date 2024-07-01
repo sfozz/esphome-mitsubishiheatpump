@@ -20,6 +20,7 @@
 #include "esphome.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/select/select.h"
+#include "esphome/components/sensor/sensor.h"
 #include "esphome/core/preferences.h"
 #include <chrono>
 
@@ -69,7 +70,9 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
 
         esphome::binary_sensor::BinarySensor* internal_power_on;
         esphome::binary_sensor::BinarySensor* device_state_active;
+        esphome::binary_sensor::BinarySensor* device_state_initialized;
         esphome::binary_sensor::BinarySensor* device_status_operating;
+        esphome::sensor::Sensor* pid_set_point_correction;
 
         // Print a banner with library information.
         void banner();
