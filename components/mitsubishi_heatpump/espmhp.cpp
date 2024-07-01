@@ -1069,7 +1069,7 @@ void MitsubishiHeatPump::run_workflows() {
     }
 
     const float setPointCorrection = this->pidController->update(this->current_temperature);
-    pid_set_point_correct->publish_state(setPointCorrection);
+    pid_set_point_correction->publish_state(setPointCorrection);
     ESP_LOGI(TAG, "PIDController set point correction: %.1f", setPointCorrection);
 
     heatpumpSettings currentSettings = hp->getSettings();
