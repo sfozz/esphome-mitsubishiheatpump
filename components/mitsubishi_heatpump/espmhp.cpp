@@ -43,6 +43,8 @@ MitsubishiHeatPump::MitsubishiHeatPump(
     device_state_initialized = new esphome::binary_sensor::BinarySensor();
     device_status_operating = new esphome::binary_sensor::BinarySensor();
     pid_set_point_correction = new esphome::sensor::Sensor();
+    pid_set_point_correction->set_unit_of_measurement("°C");
+    pid_set_point_correction->set_accuracy_decimals(1);
 
     this->traits_.set_supports_action(true);
     this->traits_.set_supports_current_temperature(true);
@@ -1092,7 +1094,7 @@ void MitsubishiHeatPump::run_workflows() {
                 return;
             }
 
-            //this.updateHeatingSetpoint(setPointCorrection);
+            this.updateHeatingSetpoint(setPointCorrection);
             break;
         }
         case climate::CLIMATE_ACTION_COOLING: {
@@ -1107,7 +1109,7 @@ void MitsubishiHeatPump::run_workflows() {
                 return;
             }
 
-            //this.updateCoolingSetpoint(setPointCorrection);
+            this.updateCoolingSetpoint(setPointCorrection);
             break;
         }
         case climate::CLIMATE_ACTION_IDLE: {
