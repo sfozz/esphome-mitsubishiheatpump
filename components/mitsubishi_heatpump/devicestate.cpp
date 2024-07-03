@@ -3,6 +3,26 @@
 namespace devicestate {
     static const char* TAG = "DeviceStateManager"; // Logging tag
 
+    bool same_float(const float left, const float right, const float delta) {
+        return fabs(left - right) <= 0.001;
+    }
+
+    bool deviceStatusEqual(DeviceStatus left, DeviceStatus right) {
+        return left.operating == right.operating &&
+        same_float(left.currentTemperature, right.currentTemperature, 0.1);
+    }
+
+    bool deviceStateEqual(DeviceState left, DeviceState right) {
+        return left.active == right.active &&
+        left.mode == right.mode &&
+        left.fanMode == right.fanMode &&
+        left.swingMode == right.swingMode &&
+        left.verticalSwingMode == right.verticalSwingMode &&
+        left.horizontalSwingMode == right.horizontalSwingMode &&
+        same_float(left.targetTemperature, right.targetTemperature, 0.1) &&
+        left.connected == right.connected;
+    }
+
     // Function to convert a Color enum value to its string 
     // representation 
     const char* deviceModeToString(DeviceMode mode) 
@@ -147,14 +167,14 @@ namespace devicestate {
         #ifdef USE_CALLBACKS
             hp->setSettingsChangedCallback(
                     [this]() {
-                        ESP_LOGI(TAG, "Callback hpSettingsChanged");
+                        ESP_LOGW(TAG, "Callback hpSettingsChanged");
                         this->hpSettingsChanged();
                     }
             );
 
             hp->setStatusChangedCallback(
                     [this](heatpumpStatus currentStatus) {
-                        ESP_LOGI(TAG, "Callback hpStatusChanged");
+                        ESP_LOGW(TAG, "Callback hpStatusChanged");
                         this->hpStatusChanged(currentStatus);
                     }
             );

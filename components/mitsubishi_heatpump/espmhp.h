@@ -208,6 +208,9 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         void run_workflows();
 
         bool isComponentActive();
+
+        devicestate::DeviceState lastDeviceState;
+        devicestate::DeviceStatus lastDeviceStatus;
 };
 
 #endif

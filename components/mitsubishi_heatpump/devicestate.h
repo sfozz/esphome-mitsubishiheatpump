@@ -68,7 +68,7 @@ namespace devicestate {
     bool operating;
     float currentTemperature;
   };
-
+  bool deviceStatusEqual(DeviceStatus left, DeviceStatus right);
   DeviceStatus toDeviceState(heatpumpStatus *currentStatus);
 
   struct DeviceState {
@@ -81,7 +81,7 @@ namespace devicestate {
     float targetTemperature;
     bool connected;
   };
-
+  bool deviceStateEqual(DeviceState left, DeviceState right);
   DeviceState toDeviceState(heatpumpSettings *currentSettings);
 
   class DeviceStateManager {

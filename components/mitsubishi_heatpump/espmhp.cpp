@@ -465,6 +465,14 @@ void MitsubishiHeatPump::updateDevice() {
      */
     const DeviceState deviceState = this->dsm->getDeviceState();
     const DeviceStatus deviceStatus = this->dsm->getDeviceStatus();
+    if (devicestate::deviceStateEqual(this->lastDeviceState, deviceState) && devicestate::deviceStatusEqual(this->lastDeviceStatus, deviceStatus)) {
+        ESP_LOGD(TAG, "Skipping updateDevice due to no change");
+        return;
+    }
+    ESP_LOGI(TAG, "Running updateDevice...");
+    this->lastDeviceState = deviceState;
+    this->lastDeviceStatus = deviceStatus;
+
     device_state_active->publish_state(deviceState.active);
     device_status_operating->publish_state(deviceStatus.operating);
 
