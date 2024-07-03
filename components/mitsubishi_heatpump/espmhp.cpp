@@ -45,6 +45,9 @@ MitsubishiHeatPump::MitsubishiHeatPump(
     pid_set_point_correction = new esphome::sensor::Sensor();
     pid_set_point_correction->set_unit_of_measurement("°C");
     pid_set_point_correction->set_accuracy_decimals(1);
+    device_set_point = new esphome::sensor::Sensor();
+    device_set_point->set_unit_of_measurement("°C");
+    device_set_point->set_accuracy_decimals(1);
 
     this->traits_.set_supports_action(true);
     this->traits_.set_supports_current_temperature(true);
@@ -90,12 +93,22 @@ void MitsubishiHeatPump::banner() {
 void MitsubishiHeatPump::update() {
     // This will be called every "update_interval" milliseconds.
     //this->dump_config();
-    this->hp->sync();
-#ifndef USE_CALLBACKS
-    this->hpSettingsChanged();
-    heatpumpStatus currentStatus = hp->getStatus();
-    this->hpStatusChanged(currentStatus);
-#endif
+    this->dsm->update();
+    if (!this->dsm->isInitialized()) {
+        /*
+         * We should always get a valid pointer here once the HeatPump
+         * component fully initializes. If HeatPump hasn't read the settings
+         * from the unit yet (dsm->hp->connect() doesn't do this, sadly), we'll need
+         * to punt on the update. Likely not an issue when run in callback
+         * mode, but that isn't working right yet.
+         */
+        ESP_LOGW(TAG, "Waiting for HeatPump to read the settings the first time.");
+        esphome::delay(10);
+        return;
+    }
+
+    this->updateDevice();
+
     this->enforce_remote_temperature_sensor_timeout();
     this->run_workflows();
 }
@@ -182,25 +195,25 @@ void MitsubishiHeatPump::on_vertical_swing_change(const std::string &swing) {
     bool updated = false;
 
     if (swing == "swing") {
-        hp->setVaneSetting("SWING");
+        dsm->hp->setVaneSetting("SWING");
         updated = true;
     } else if (swing == "auto") {
-        hp->setVaneSetting("AUTO");
+        dsm->hp->setVaneSetting("AUTO");
         updated = true;
     } else if (swing == "up") {
-        hp->setVaneSetting("1");
+        dsm->hp->setVaneSetting("1");
         updated = true;
     } else if (swing == "up_center") {
-        hp->setVaneSetting("2");
+        dsm->hp->setVaneSetting("2");
         updated = true;
     } else if (swing == "center") {
-        hp->setVaneSetting("3");
+        dsm->hp->setVaneSetting("3");
         updated = true;
     } else if (swing == "down_center") {
-        hp->setVaneSetting("4");
+        dsm->hp->setVaneSetting("4");
         updated = true;
     } else if (swing == "down") {
-        hp->setVaneSetting("5");
+        dsm->hp->setVaneSetting("5");
         updated = true;
     } else {
         ESP_LOGW(TAG, "Invalid vertical vane position %s", swing);
@@ -209,7 +222,7 @@ void MitsubishiHeatPump::on_vertical_swing_change(const std::string &swing) {
     ESP_LOGD(TAG, "Vertical vane - Was HeatPump updated? %s", YESNO(updated));
 
     // and the heat pump:
-    hp->update();
+    dsm->hp->update();
 }
 
 void MitsubishiHeatPump::on_horizontal_swing_change(const std::string &swing) {
@@ -217,25 +230,25 @@ void MitsubishiHeatPump::on_horizontal_swing_change(const std::string &swing) {
     bool updated = false;
 
     if (swing == "swing") {
-        hp->setWideVaneSetting("SWING");
+        dsm->hp->setWideVaneSetting("SWING");
         updated = true;
     } else if (swing == "auto") {
-        hp->setWideVaneSetting("<>");
+        dsm->hp->setWideVaneSetting("<>");
         updated = true;
     } else if (swing == "left") {
-        hp->setWideVaneSetting("<<");
+        dsm->hp->setWideVaneSetting("<<");
         updated = true;
     } else if (swing == "left_center") {
-        hp->setWideVaneSetting("<");
+        dsm->hp->setWideVaneSetting("<");
         updated = true;
     } else if (swing == "center") {
-        hp->setWideVaneSetting("|");
+        dsm->hp->setWideVaneSetting("|");
         updated = true;
     } else if (swing == "right_center") {
-        hp->setWideVaneSetting(">");
+        dsm->hp->setWideVaneSetting(">");
         updated = true;
     } else if (swing == "right") {
-        hp->setWideVaneSetting(">>");
+        dsm->hp->setWideVaneSetting(">>");
         updated = true;
     } else {
         ESP_LOGW(TAG, "Invalid horizontal vane position %s", swing);
@@ -244,7 +257,7 @@ void MitsubishiHeatPump::on_horizontal_swing_change(const std::string &swing) {
     ESP_LOGD(TAG, "Horizontal vane - Was HeatPump updated? %s", YESNO(updated));
 
     // and the heat pump:
-    hp->update();
+    dsm->hp->update();
  }
 
 /**
@@ -281,14 +294,13 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
 
     switch (this->mode) {
         case climate::CLIMATE_MODE_COOL:
-            hp->setModeSetting("COOL");
-            hp->setPowerSetting("ON");
-            this->internalPowerOn = true;
-            internal_power_on->publish_state(this->internalPowerOn);
+            this->dsm->setCool();
+            internal_power_on->publish_state(this->dsm->isInternalPowerOn());
 
             if (has_mode){
                 if (cool_setpoint.has_value() && !has_temp) {
-                    hp->setTemperature(cool_setpoint.value());
+                    dsm->hp->setTemperature(cool_setpoint.value());
+                    device_set_point->publish_state(cool_setpoint.value());
                     this->update_setpoint(cool_setpoint.value());
                 }
                 this->action = climate::CLIMATE_ACTION_IDLE;
@@ -296,14 +308,13 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
             }
             break;
         case climate::CLIMATE_MODE_HEAT:
-            hp->setModeSetting("HEAT");
-            hp->setPowerSetting("ON");
-            this->internalPowerOn = true;
-            internal_power_on->publish_state(this->internalPowerOn);
+            this->dsm->setHeat();
+            internal_power_on->publish_state(this->dsm->isInternalPowerOn());
 
             if (has_mode){
                 if (heat_setpoint.has_value() && !has_temp) {
-                    hp->setTemperature(heat_setpoint.value());
+                    dsm->hp->setTemperature(heat_setpoint.value());
+                    device_set_point->publish_state(heat_setpoint.value());
                     this->update_setpoint(heat_setpoint.value());
                 }
                 this->action = climate::CLIMATE_ACTION_IDLE;
@@ -311,10 +322,8 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
             }
             break;
         case climate::CLIMATE_MODE_DRY:
-            hp->setModeSetting("DRY");
-            hp->setPowerSetting("ON");
-            this->internalPowerOn = true;
-            internal_power_on->publish_state(this->internalPowerOn);
+            this->dsm->setDry();
+            internal_power_on->publish_state(this->dsm->isInternalPowerOn());
 
             if (has_mode){
                 this->action = climate::CLIMATE_ACTION_DRYING;
@@ -322,14 +331,13 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
             }
             break;
         case climate::CLIMATE_MODE_HEAT_COOL:
-            hp->setModeSetting("AUTO");
-            hp->setPowerSetting("ON");
-            this->internalPowerOn = true;
-            internal_power_on->publish_state(this->internalPowerOn);
+            this->dsm->setAuto();
+            internal_power_on->publish_state(this->dsm->isInternalPowerOn());
 
             if (has_mode){
                 if (auto_setpoint.has_value() && !has_temp) {
-                    hp->setTemperature(auto_setpoint.value());
+                    dsm->hp->setTemperature(auto_setpoint.value());
+                    device_set_point->publish_state(auto_setpoint.value());
                     this->update_setpoint(auto_setpoint.value());
                 }
                 this->action = climate::CLIMATE_ACTION_IDLE;
@@ -337,10 +345,8 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
             updated = true;
             break;
         case climate::CLIMATE_MODE_FAN_ONLY:
-            hp->setModeSetting("FAN");
-            hp->setPowerSetting("ON");
-            this->internalPowerOn = true;
-            internal_power_on->publish_state(this->internalPowerOn);
+            this->dsm->setFan();
+            internal_power_on->publish_state(this->dsm->isInternalPowerOn());
 
             if (has_mode){
                 this->action = climate::CLIMATE_ACTION_FAN;
@@ -350,9 +356,8 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
         case climate::CLIMATE_MODE_OFF:
         default:
             if (has_mode){
-                hp->setPowerSetting("OFF");
-                this->internalPowerOn = false;
-                internal_power_on->publish_state(this->internalPowerOn);
+                this->dsm->turnOff();
+                internal_power_on->publish_state(this->dsm->isInternalPowerOn());
                 this->action = climate::CLIMATE_ACTION_OFF;
                 updated = true;
             }
@@ -364,7 +369,8 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
             "control", "Sending target temp: %.1f",
             *call.get_target_temperature()
         );
-        hp->setTemperature(*call.get_target_temperature());
+        dsm->hp->setTemperature(*call.get_target_temperature());
+        device_set_point->publish_state(*call.get_target_temperature());
         this->update_setpoint(*call.get_target_temperature());
         updated = true;
     }
@@ -376,33 +382,33 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
         this->fan_mode = *call.get_fan_mode();
         switch(*call.get_fan_mode()) {
             case climate::CLIMATE_FAN_OFF:
-                hp->setPowerSetting("OFF");
+                dsm->hp->setPowerSetting("OFF");
                 updated = true;
                 break;
             case climate::CLIMATE_FAN_DIFFUSE:
-                hp->setFanSpeed("QUIET");
+                dsm->hp->setFanSpeed("QUIET");
                 updated = true;
                 break;
             case climate::CLIMATE_FAN_LOW:
-                hp->setFanSpeed("1");
+                dsm->hp->setFanSpeed("1");
                 updated = true;
                 break;
             case climate::CLIMATE_FAN_MEDIUM:
-                hp->setFanSpeed("2");
+                dsm->hp->setFanSpeed("2");
                 updated = true;
                 break;
             case climate::CLIMATE_FAN_MIDDLE:
-                hp->setFanSpeed("3");
+                dsm->hp->setFanSpeed("3");
                 updated = true;
                 break;
             case climate::CLIMATE_FAN_HIGH:
-                hp->setFanSpeed("4");
+                dsm->hp->setFanSpeed("4");
                 updated = true;
                 break;
             case climate::CLIMATE_FAN_ON:
             case climate::CLIMATE_FAN_AUTO:
             default:
-                hp->setFanSpeed("AUTO");
+                dsm->hp->setFanSpeed("AUTO");
                 updated = true;
                 break;
         }
@@ -418,23 +424,23 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
         this->swing_mode = *call.get_swing_mode();
         switch(*call.get_swing_mode()) {
             case climate::CLIMATE_SWING_OFF:
-                hp->setVaneSetting("AUTO");
-                hp->setWideVaneSetting("|");
+                dsm->hp->setVaneSetting("AUTO");
+                dsm->hp->setWideVaneSetting("|");
                 updated = true;
                 break;
             case climate::CLIMATE_SWING_VERTICAL:
-                hp->setVaneSetting("SWING");
-                hp->setWideVaneSetting("|");
+                dsm->hp->setVaneSetting("SWING");
+                dsm->hp->setWideVaneSetting("|");
                 updated = true;
                 break;
             case climate::CLIMATE_SWING_HORIZONTAL:
-                hp->setVaneSetting("3");
-                hp->setWideVaneSetting("SWING");
+                dsm->hp->setVaneSetting("3");
+                dsm->hp->setWideVaneSetting("SWING");
                 updated = true;
                 break;
             case climate::CLIMATE_SWING_BOTH:
-                hp->setVaneSetting("SWING");
-                hp->setWideVaneSetting("SWING");
+                dsm->hp->setVaneSetting("SWING");
+                dsm->hp->setWideVaneSetting("SWING");
                 updated = true;
                 break;
             default:
@@ -447,271 +453,208 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
     // send the update back to esphome:
     this->publish_state();
     // and the heat pump:
-    hp->update();
+    dsm->hp->update();
 }
 
-void MitsubishiHeatPump::hpSettingsChanged() {
-    this->settingsUpdated = true;
-
-    heatpumpSettings currentSettings = hp->getSettings();
-    if (currentSettings.power == NULL) {
-        /*
-         * We should always get a valid pointer here once the HeatPump
-         * component fully initializes. If HeatPump hasn't read the settings
-         * from the unit yet (hp->connect() doesn't do this, sadly), we'll need
-         * to punt on the update. Likely not an issue when run in callback
-         * mode, but that isn't working right yet.
-         */
-        ESP_LOGW(TAG, "Waiting for HeatPump to read the settings the first time.");
-        esphome::delay(10);
-        return;
-    }
-
+void MitsubishiHeatPump::updateDevice() {
     /*
      * ************ HANDLE POWER AND MODE CHANGES ***********
      * https://github.com/geoffdavis/HeatPump/blob/stream/src/HeatPump.h#L125
      * const char* POWER_MAP[2]       = {"OFF", "ON"};
      * const char* MODE_MAP[5]        = {"HEAT", "DRY", "COOL", "FAN", "AUTO"};
      */
-    const DeviceState deviceState = devicestate::toDeviceState(&currentSettings);
+    const DeviceState deviceState = this->dsm->getDeviceState();
+    const DeviceStatus deviceStatus = this->dsm->getDeviceStatus();
     device_state_active->publish_state(deviceState.active);
-    if (this->initializedState) {
-        if (this->internalPowerOn != deviceState.active) {
-            ESP_LOGI(TAG, "Device active on change: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->internalPowerOn));
-        }
-    } else {
-        if (this->internalPowerOn != deviceState.active) {
-            ESP_LOGW(TAG, "Initializing internalPowerOn state from %s to %s", ONOFF(this->internalPowerOn), ONOFF(deviceState.active));
-            this->internalPowerOn = deviceState.active;
-        }
-        internal_power_on->publish_state(this->internalPowerOn);
+    device_status_operating->publish_state(deviceStatus.operating);
 
-        this->initializedState = true;
-        device_state_initialized->publish_state(this->initializedState);
-    }
+    this->current_temperature = deviceStatus.currentTemperature;
+    this->operating_ = deviceStatus.operating;
     
+    this->ensure_pid_target();
+
+    internal_power_on->publish_state(this->dsm->isInternalPowerOn());
 
     // We cannot use the internal state of the device initialize component state
     if (this->isComponentActive()) {
         switch (deviceState.mode) {
-            case DeviceMode::Heat:
+            case DeviceMode::DeviceMode_Heat:
                 this->mode = climate::CLIMATE_MODE_HEAT;
-                if (heat_setpoint != currentSettings.temperature) {
-                    heat_setpoint = currentSettings.temperature;
-                    save(currentSettings.temperature, heat_storage);
+                if (heat_setpoint != deviceState.targetTemperature) {
+                    heat_setpoint = deviceState.targetTemperature;
+                    save(deviceState.targetTemperature, heat_storage);
                 }
 
-                if (deviceState.active) {
-                    this->action = climate::CLIMATE_ACTION_IDLE;
+                if (deviceStatus.operating) {
+                    this->action = climate::CLIMATE_ACTION_HEATING;
                 } else {
-                    this->action = climate::CLIMATE_ACTION_OFF;
+                    if (this->dsm->isInternalPowerOn()) {
+                        this->action = climate::CLIMATE_ACTION_IDLE;
+                    } else {
+                        this->action = climate::CLIMATE_ACTION_OFF;
+                    }
                 }
                 break;
-            case DeviceMode::Dry:
+            case DeviceMode::DeviceMode_Dry:
                 this->mode = climate::CLIMATE_MODE_DRY;
-                this->action = climate::CLIMATE_ACTION_DRYING;
+                if (deviceStatus.operating) {
+                    this->action = climate::CLIMATE_ACTION_DRYING;
+                } else {
+                    if (this->dsm->isInternalPowerOn()) {
+                        this->action = climate::CLIMATE_ACTION_IDLE;
+                    } else {
+                        this->action = climate::CLIMATE_ACTION_OFF;
+                    }
+                }
                 break;
-            case DeviceMode::Cool:
+            case DeviceMode::DeviceMode_Cool:
                 this->mode = climate::CLIMATE_MODE_COOL;
-                if (cool_setpoint != currentSettings.temperature) {
-                    cool_setpoint = currentSettings.temperature;
-                    save(currentSettings.temperature, cool_storage);
+                if (cool_setpoint != deviceState.targetTemperature) {
+                    cool_setpoint = deviceState.targetTemperature;
+                    save(deviceState.targetTemperature, cool_storage);
                 }
 
-                if (deviceState.active) {
-                    this->action = climate::CLIMATE_ACTION_IDLE;
+                if (deviceStatus.operating) {
+                    this->action = climate::CLIMATE_ACTION_COOLING;
                 } else {
-                    this->action = climate::CLIMATE_ACTION_OFF;
+                    if (this->dsm->isInternalPowerOn()) {
+                        this->action = climate::CLIMATE_ACTION_IDLE;
+                    } else {
+                        this->action = climate::CLIMATE_ACTION_OFF;
+                    }
                 }
                 break;
-            case DeviceMode::Fan:
+            case DeviceMode::DeviceMode_Fan:
                 this->mode = climate::CLIMATE_MODE_FAN_ONLY;
                 this->action = climate::CLIMATE_ACTION_FAN;
                 break;
-            case DeviceMode::Auto:
+            case DeviceMode::DeviceMode_Auto:
                 this->mode = climate::CLIMATE_MODE_HEAT_COOL;
-                if (auto_setpoint != currentSettings.temperature) {
-                    auto_setpoint = currentSettings.temperature;
-                    save(currentSettings.temperature, auto_storage);
+                if (auto_setpoint != deviceState.targetTemperature) {
+                    auto_setpoint = deviceState.targetTemperature;
+                    save(deviceState.targetTemperature, auto_storage);
                 }
 
-                if (deviceState.active) {
+                if (this->dsm->isInternalPowerOn()) {
                     this->action = climate::CLIMATE_ACTION_IDLE;
                 } else {
                     this->action = climate::CLIMATE_ACTION_OFF;
+                }
+
+                if (deviceStatus.operating) {
+                    if (this->current_temperature > this->target_temperature) {
+                        this->action = climate::CLIMATE_ACTION_COOLING;
+                    } else if (this->current_temperature < this->target_temperature) {
+                        this->action = climate::CLIMATE_ACTION_HEATING;
+                    }
                 }
                 break;
             default:
                 ESP_LOGW(
                         TAG,
                         "Unknown climate mode value %s received from HeatPump",
-                        currentSettings.mode
+                        devicestate::deviceModeToString(deviceState.mode)
                 );
+                if (this->dsm->isInternalPowerOn()) {
+                    this->action = climate::CLIMATE_ACTION_IDLE;
+                } else {
+                    this->action = climate::CLIMATE_ACTION_OFF;
+                }
         }
     } else {
         this->mode = climate::CLIMATE_MODE_OFF;
         this->action = climate::CLIMATE_ACTION_OFF;
     }
 
-    ESP_LOGI(TAG, "Climate mode is: %i", this->mode);
+    ESP_LOGD(TAG, "Climate mode is: %i", this->mode);
 
     /*
      * ******* HANDLE FAN CHANGES ********
      *
      * const char* FAN_MAP[6]         = {"AUTO", "QUIET", "1", "2", "3", "4"};
      */
-    if (strcmp(currentSettings.fan, "QUIET") == 0) {
-        this->fan_mode = climate::CLIMATE_FAN_DIFFUSE;
-    } else if (strcmp(currentSettings.fan, "1") == 0) {
+
+    switch (deviceState.fanMode) {
+        case FanMode::FanMode_Quiet:
+            this->fan_mode = climate::CLIMATE_FAN_DIFFUSE;
+        case FanMode::FanMode_Low:
             this->fan_mode = climate::CLIMATE_FAN_LOW;
-    } else if (strcmp(currentSettings.fan, "2") == 0) {
+        case FanMode::FanMode_Medium:
             this->fan_mode = climate::CLIMATE_FAN_MEDIUM;
-    } else if (strcmp(currentSettings.fan, "3") == 0) {
+        case FanMode::FanMode_Middle:
             this->fan_mode = climate::CLIMATE_FAN_MIDDLE;
-    } else if (strcmp(currentSettings.fan, "4") == 0) {
+        case FanMode::FanMode_High:
             this->fan_mode = climate::CLIMATE_FAN_HIGH;
-    } else { //case "AUTO" or default:
-        this->fan_mode = climate::CLIMATE_FAN_AUTO;
+        default:
+            this->fan_mode = climate::CLIMATE_FAN_AUTO;
     }
-    ESP_LOGI(TAG, "Fan mode is: %i", this->fan_mode.value_or(-1));
+    ESP_LOGD(TAG, "Fan mode is: %i", this->fan_mode.value_or(-1));
 
     /* ******** HANDLE MITSUBISHI VANE CHANGES ********
      * const char* VANE_MAP[7]        = {"AUTO", "1", "2", "3", "4", "5", "SWING"};
      */
-    if (strcmp(currentSettings.vane, "SWING") == 0 &&
-        strcmp(currentSettings.wideVane, "SWING") == 0) {
-        this->swing_mode = climate::CLIMATE_SWING_BOTH;
-    } else if (strcmp(currentSettings.vane, "SWING") == 0) {
-        this->swing_mode = climate::CLIMATE_SWING_VERTICAL;
-    } else if (strcmp(currentSettings.wideVane, "SWING") == 0) {
-        this->swing_mode = climate::CLIMATE_SWING_HORIZONTAL;
-    } else {
-        this->swing_mode = climate::CLIMATE_SWING_OFF;
+    switch (deviceState.swingMode) {
+        case SwingMode::SwingMode_Both:
+            this->swing_mode = climate::CLIMATE_SWING_BOTH;
+        case SwingMode::SwingMode_Vertical:
+            this->swing_mode = climate::CLIMATE_SWING_VERTICAL;
+        case SwingMode::SwingMode_Horizontal:
+            this->swing_mode = climate::CLIMATE_SWING_HORIZONTAL;
+        case SwingMode::SwingMode_Off:
+            this->swing_mode = climate::CLIMATE_SWING_OFF;
     }
-    ESP_LOGI(TAG, "Swing mode is: %i", this->swing_mode);
-    if (strcmp(currentSettings.vane, "SWING") == 0) {
-        this->update_swing_vertical("swing");
-    } else if (strcmp(currentSettings.vane, "AUTO") == 0) {
-        this->update_swing_vertical("auto");
-    } else if (strcmp(currentSettings.vane, "1") == 0) {
-        this->update_swing_vertical("up");
-    } else if (strcmp(currentSettings.vane, "2") == 0) {
-        this->update_swing_vertical("up_center");
-    } else if (strcmp(currentSettings.vane, "3") == 0) {
-        this->update_swing_vertical("center");
-    } else if (strcmp(currentSettings.vane, "4") == 0) {
-        this->update_swing_vertical("down_center");
-    } else if (strcmp(currentSettings.vane, "5") == 0) {
-        this->update_swing_vertical("down");
+    ESP_LOGD(TAG, "Swing mode is: %i", this->swing_mode);
+
+    switch(deviceState.verticalSwingMode) {
+        case VerticalSwingMode::VerticalSwingMode_Swing:
+            this->update_swing_vertical("swing");
+        case VerticalSwingMode::VerticalSwingMode_Auto:
+            this->update_swing_vertical("auto");
+        case VerticalSwingMode::VerticalSwingMode_Up:
+            this->update_swing_vertical("up");
+        case VerticalSwingMode::VerticalSwingMode_UpCenter:
+            this->update_swing_vertical("up_center");
+        case VerticalSwingMode::VerticalSwingMode_Center:
+            this->update_swing_vertical("center");
+        case VerticalSwingMode::VerticalSwingMode_DownCenter:
+            this->update_swing_vertical("down_center");
+        case VerticalSwingMode::VerticalSwingMode_Down:
+            this->update_swing_vertical("down");
+        default:
+            break;
     }
+    ESP_LOGD(TAG, "Vertical vane mode is: %s", deviceState.vane);
 
-    ESP_LOGI(TAG, "Vertical vane mode is: %s", currentSettings.vane);
-
-    if (strcmp(currentSettings.wideVane, "SWING") == 0) {
-        this->update_swing_horizontal("swing");
-    } else if (strcmp(currentSettings.wideVane, "<>") == 0) {
-        this->update_swing_horizontal("auto");
-    } else if (strcmp(currentSettings.wideVane, "<<") == 0) {
-        this->update_swing_horizontal("left");
-    } else if (strcmp(currentSettings.wideVane, "<") == 0) {
-        this->update_swing_horizontal("left_center");
-    } else if (strcmp(currentSettings.wideVane, "|") == 0) {
-        this->update_swing_horizontal("center");
-    } else if (strcmp(currentSettings.wideVane, ">") == 0) {
-        this->update_swing_horizontal("right_center");
-    } else if (strcmp(currentSettings.wideVane, ">>") == 0) {
-        this->update_swing_horizontal("right");
+    switch(deviceState.horizontalSwingMode) {
+        case HorizontalSwingMode::HorizontalSwingMode_Swing:
+            this->update_swing_horizontal("swing");
+        case HorizontalSwingMode::HorizontalSwingMode_Auto:
+            this->update_swing_horizontal("auto");
+        case HorizontalSwingMode::HorizontalSwingMode_Left:
+            this->update_swing_horizontal("left");
+        case HorizontalSwingMode::HorizontalSwingMode_LeftCenter:
+            this->update_swing_horizontal("left_center");
+        case HorizontalSwingMode::HorizontalSwingMode_Center:
+            this->update_swing_horizontal("center");
+        case HorizontalSwingMode::HorizontalSwingMode_RightCenter:
+            this->update_swing_horizontal("right_center");
+        case HorizontalSwingMode::HorizontalSwingMode_Right:
+            this->update_swing_horizontal("right");
+        default:
+            break;
     }
-
-    ESP_LOGI(TAG, "Horizontal vane mode is: %s", currentSettings.wideVane);
-
-
+    ESP_LOGD(TAG, "Horizontal vane mode is: %s", deviceState.wideVane);
 
     /*
      * ******** HANDLE TARGET TEMPERATURE CHANGES ********
      */
-    this->update_setpoint(currentSettings.temperature);
-    ESP_LOGI(TAG, "Target temp is: %f", this->target_temperature);
+    this->update_setpoint(deviceState.targetTemperature);
+    device_set_point->publish_state(deviceState.targetTemperature);
+    ESP_LOGD(TAG, "Target temp is: %f", this->target_temperature);
 
     /*
      * ******** Publish state back to ESPHome. ********
      */
-    this->publish_state();
-}
-
-/**
- * Report changes in the current temperature sensed by the HeatPump.
- */
-void MitsubishiHeatPump::hpStatusChanged(heatpumpStatus currentStatus) {
-    this->statusUpdated = true;
-    device_status_operating->publish_state(currentStatus.operating);
-
-    this->current_temperature = currentStatus.roomTemperature;
-    switch (this->mode) {
-        case climate::CLIMATE_MODE_HEAT:
-            if (currentStatus.operating) {
-                this->action = climate::CLIMATE_ACTION_HEATING;
-            }
-            else {
-                if (this->internalPowerOn) {
-                    this->action = climate::CLIMATE_ACTION_IDLE;
-                } else {
-                    this->action = climate::CLIMATE_ACTION_OFF;
-                }
-            }
-            break;
-        case climate::CLIMATE_MODE_COOL:
-            if (currentStatus.operating) {
-                this->action = climate::CLIMATE_ACTION_COOLING;
-            }
-            else {
-                if (this->internalPowerOn) {
-                    this->action = climate::CLIMATE_ACTION_IDLE;
-                } else {
-                    this->action = climate::CLIMATE_ACTION_OFF;
-                }
-            }
-            break;
-        case climate::CLIMATE_MODE_HEAT_COOL:
-            if (this->internalPowerOn) {
-                this->action = climate::CLIMATE_ACTION_IDLE;
-            } else {
-                this->action = climate::CLIMATE_ACTION_OFF;
-            }
-
-            if (currentStatus.operating) {
-              if (this->current_temperature > this->target_temperature) {
-                  this->action = climate::CLIMATE_ACTION_COOLING;
-              } else if (this->current_temperature < this->target_temperature) {
-                  this->action = climate::CLIMATE_ACTION_HEATING;
-              }
-            }
-            break;
-        case climate::CLIMATE_MODE_DRY:
-            if (currentStatus.operating) {
-                this->action = climate::CLIMATE_ACTION_DRYING;
-            }
-            else {
-                if (this->internalPowerOn) {
-                    this->action = climate::CLIMATE_ACTION_IDLE;
-                } else {
-                    this->action = climate::CLIMATE_ACTION_OFF;
-                }
-            }
-            break;
-        case climate::CLIMATE_MODE_FAN_ONLY:
-            this->action = climate::CLIMATE_ACTION_FAN;
-            break;
-        default:
-            if (this->internalPowerOn) {
-                this->action = climate::CLIMATE_ACTION_IDLE;
-            } else {
-                this->action = climate::CLIMATE_ACTION_OFF;
-            }
-    }
-
-    this->operating_ = currentStatus.operating;
-
     this->publish_state();
 }
 
@@ -724,7 +667,7 @@ void MitsubishiHeatPump::set_remote_temperature(float temp) {
         last_remote_temperature_sensor_update_.reset();
     }
 
-    this->hp->setRemoteTemperature(temp);
+    this->dsm->hp->setRemoteTemperature(temp);
 }
 
 void MitsubishiHeatPump::ping() {
@@ -786,23 +729,7 @@ void MitsubishiHeatPump::setup() {
     }
 
     ESP_LOGCONFIG(TAG, "Initializing new HeatPump object.");
-    this->hp = new HeatPump();
-
-#ifdef USE_CALLBACKS
-    hp->setSettingsChangedCallback(
-            [this]() {
-                this->hpSettingsChanged();
-            }
-    );
-
-    hp->setStatusChangedCallback(
-            [this](heatpumpStatus currentStatus) {
-                this->hpStatusChanged(currentStatus);
-            }
-    );
-
-    hp->setPacketCallback(this->log_packet);    
-#endif
+    this->dsm = new devicestate::DeviceStateManager();
 
     ESP_LOGCONFIG(
             TAG,
@@ -812,9 +739,9 @@ void MitsubishiHeatPump::setup() {
             YESNO((void *)this->get_hw_serial_() == (void *)&Serial)
     );
 
-    ESP_LOGCONFIG(TAG, "Calling hp->connect(%p)", this->get_hw_serial_());
-    if (hp->connect(this->get_hw_serial_(), this->baud_, this->rx_pin_, this->tx_pin_)) {
-        hp->sync();
+    ESP_LOGCONFIG(TAG, "Calling dsm->hp->connect(%p)", this->get_hw_serial_());
+    if (dsm->hp->connect(this->get_hw_serial_(), this->baud_, this->rx_pin_, this->tx_pin_)) {
+        dsm->hp->sync();
     }
     else {
         ESP_LOGCONFIG(
@@ -839,7 +766,7 @@ void MitsubishiHeatPump::setup() {
         i,
         d,
         this->get_update_interval(),
-        0.0,
+        (max_temp + min_temp) / 2.0, // Set target to mid point of min/max
         min_temp,
         max_temp
     );
@@ -866,8 +793,7 @@ void MitsubishiHeatPump::setup() {
         this->horizontal_swing_state_ = "auto";
     }
 
-    internal_power_on->publish_state(this->internalPowerOn);
-    device_state_initialized->publish_state(this->initializedState);
+    internal_power_on->publish_state(this->dsm->isInternalPowerOn());
 
     this->dump_config();
 }
@@ -905,26 +831,13 @@ void MitsubishiHeatPump::dump_state() {
     ESP_LOGI(TAG, "HELLO");
 }
 
-void MitsubishiHeatPump::log_packet(byte* packet, unsigned int length, char* packetDirection) {
-    String packetHex;
-    char textBuf[15];
-
-    for (int i = 0; i < length; i++) {
-        memset(textBuf, 0, 15);
-        sprintf(textBuf, "%02X ", packet[i]);
-        packetHex += textBuf;
-    }
-    
-    ESP_LOGV(TAG, "PKT: [%s] %s", packetDirection, packetHex.c_str());
-}
-
 bool MitsubishiHeatPump::isComponentActive() {
     return this->mode != climate::CLIMATE_MODE_OFF;
 }
 
 void MitsubishiHeatPump::dump_heat_pump_details(const devicestate::DeviceState& deviceState) {
     ESP_LOGI(TAG, "Internal State");
-    ESP_LOGI(TAG, "  active: %s", TRUEFALSE(this->internalPowerOn));
+    ESP_LOGI(TAG, "  active: %s", TRUEFALSE(this->dsm->isInternalPowerOn()));
     /*
     struct DeviceState {
         bool active;
@@ -934,7 +847,7 @@ void MitsubishiHeatPump::dump_heat_pump_details(const devicestate::DeviceState& 
     */
     ESP_LOGI(TAG, "Device State");
     ESP_LOGI(TAG, "  active: %s", TRUEFALSE(deviceState.active));
-    ESP_LOGI(TAG, "  mode: unknown"); // , deviceState.mode
+    ESP_LOGI(TAG, "  mode: %s", devicestate::deviceModeToString(deviceState.mode));
     ESP_LOGI(TAG, "  targetTemperature: %f", deviceState.targetTemperature);
     /*
     struct heatpumpStatus {
@@ -944,13 +857,11 @@ void MitsubishiHeatPump::dump_heat_pump_details(const devicestate::DeviceState& 
         int compressorFrequency;
     };
     */
-    ESP_LOGI(TAG, "Heatpump Status: %s", YESNO(this->statusUpdated));
-    if (this->statusUpdated) {
-        heatpumpStatus currentStatus = hp->getStatus();
-        ESP_LOGI(TAG, "  roomTemperature: %f", currentStatus.roomTemperature);
-        ESP_LOGI(TAG, "  operating: %s", TRUEFALSE(currentStatus.operating));
-        ESP_LOGI(TAG, "  compressorFrequency: %f", currentStatus.compressorFrequency);
-    }
+    ESP_LOGI(TAG, "Heatpump Status");
+    heatpumpStatus currentStatus = dsm->hp->getStatus();
+    ESP_LOGI(TAG, "  roomTemperature: %f", currentStatus.roomTemperature);
+    ESP_LOGI(TAG, "  operating: %s", TRUEFALSE(currentStatus.operating));
+    //ESP_LOGI(TAG, "  compressorFrequency: %f", currentStatus.compressorFrequency);
 
     /*
     struct heatpumpSettings {
@@ -965,17 +876,15 @@ void MitsubishiHeatPump::dump_heat_pump_details(const devicestate::DeviceState& 
     };
     */
     
-    ESP_LOGI(TAG, "Heatpump Settings: %s", YESNO(this->settingsUpdated));
-    if (this->settingsUpdated) {
-        heatpumpSettings currentSettings = hp->getSettings();
-        ESP_LOGI(TAG, "  power: %s", currentSettings.power);
-        ESP_LOGI(TAG, "  mode: %s", currentSettings.mode);
-        ESP_LOGI(TAG, "  temperature: %f", currentSettings.temperature);
-        ESP_LOGI(TAG, "  fan: %s", currentSettings.fan);
-        ESP_LOGI(TAG, "  vane: %s", currentSettings.vane);
-        ESP_LOGI(TAG, "  wideVane: %s", currentSettings.wideVane);
-        ESP_LOGI(TAG, "  connected: %s", TRUEFALSE(currentSettings.connected));
-    }
+    ESP_LOGI(TAG, "Heatpump Settings");
+    heatpumpSettings currentSettings = dsm->hp->getSettings();
+    ESP_LOGI(TAG, "  power: %s", currentSettings.power);
+    ESP_LOGI(TAG, "  mode: %s", currentSettings.mode);
+    ESP_LOGI(TAG, "  temperature: %f", currentSettings.temperature);
+    ESP_LOGI(TAG, "  fan: %s", currentSettings.fan);
+    ESP_LOGI(TAG, "  vane: %s", currentSettings.vane);
+    ESP_LOGI(TAG, "  wideVane: %s", currentSettings.wideVane);
+    ESP_LOGI(TAG, "  connected: %s", TRUEFALSE(currentSettings.connected));
 
     /*
     ESP_LOGI(TAG, "Current temperature (state):  %f", this->current_temperature);
@@ -991,6 +900,7 @@ void MitsubishiHeatPump::ensure_pid_target() {
     if (!this->same_float(this->target_temperature, this->pidController->getTarget())) {
         ESP_LOGI(TAG, "PID Target temp changing from %f to %f", this->pidController->getTarget(), this->target_temperature);
         this->pidController->setTarget(this->target_temperature);
+        this->pidController->resetState();
     }
 }
 
@@ -1008,54 +918,7 @@ void MitsubishiHeatPump::update_setpoint(const float value) {
     this->pidController->setTarget(this->target_temperature);
 }
 
-void MitsubishiHeatPump::internalTurnOn() {
-    const uint32_t end = esphome::millis();
-    const int durationInMilliseconds = end - this->lastInternalPowerUpdate;
-    const int durationInSeconds = durationInMilliseconds / 1000;
-    const int remaining = 60 - durationInSeconds; 
-    if (remaining > 0) {
-        ESP_LOGD(TAG, "Throttling internal turn on: %i seconds remaining", remaining);
-        return;
-    }
-
-    hp->setPowerSetting("ON");
-    if (hp->update()) {
-        this->lastInternalPowerUpdate = end;
-        this->internalPowerOn = true;
-        internal_power_on->publish_state(this->internalPowerOn);
-        ESP_LOGW(TAG, "Performed internal turn on!");
-    } else {
-        ESP_LOGW(TAG, "Failed to perform internal turn on!");
-    }
-}
-
-void MitsubishiHeatPump::internalTurnOff() {
-    const uint32_t end = esphome::millis();
-    const int durationInMilliseconds = end - this->lastInternalPowerUpdate;
-    const int durationInSeconds = durationInMilliseconds / 1000;
-    const int remaining = 60 - durationInSeconds; 
-    if (remaining > 0) {
-        ESP_LOGD(TAG, "Throttling internal turn off: %i seconds remaining", remaining);
-        return;
-    }
-
-    hp->setPowerSetting("OFF");
-    if (hp->update()) {
-        this->lastInternalPowerUpdate = end;
-        this->internalPowerOn = false;
-        internal_power_on->publish_state(this->internalPowerOn);
-        ESP_LOGW(TAG, "Performed internal turn off!");
-    } else {
-        ESP_LOGW(TAG, "Failed to perform internal turn off!");
-    }
-}
-
 void MitsubishiHeatPump::run_workflows() {
-    if (!this->statusUpdated || !this->settingsUpdated) {
-        ESP_LOGD(TAG, "System not ready, skipping run_workflows statusUpdated={%s}, settingsUpdated={%s}", YESNO(statusUpdated), YESNO(settingsUpdated));
-        return;
-    }
-
     ESP_LOGD(TAG, "Run workflows...");
 
     if (!this->isComponentActive()) {
@@ -1074,11 +937,11 @@ void MitsubishiHeatPump::run_workflows() {
     pid_set_point_correction->publish_state(setPointCorrection);
     ESP_LOGI(TAG, "PIDController set point correction: %.1f", setPointCorrection);
 
-    heatpumpSettings currentSettings = hp->getSettings();
+    heatpumpSettings currentSettings = dsm->hp->getSettings();
     const DeviceState deviceState = devicestate::toDeviceState(&currentSettings);
     device_state_active->publish_state(deviceState.active);
-    ESP_LOGI(TAG, "Device active on workflow: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->internalPowerOn));
-    if (deviceState.active != this->internalPowerOn) {
+    ESP_LOGI(TAG, "Device active on workflow: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->dsm->isInternalPowerOn()));
+    if (deviceState.active != this->dsm->isInternalPowerOn()) {
         this->dump_heat_pump_details(deviceState);
     }
     switch(this->action) {
@@ -1090,11 +953,14 @@ void MitsubishiHeatPump::run_workflows() {
             if (this->current_temperature - setPointCorrection > hysterisisUnderOff ||
                     this->same_float(setPointCorrection, this->pidController->getOutputMin())) {
                 ESP_LOGI(TAG, "Turn off heating!");
-                this->internalTurnOff();
+                if (this->dsm->internalTurnOff()) {
+                    internal_power_on->publish_state(this->dsm->isInternalPowerOn());
+                }
                 return;
             }
 
-            this.updateHeatingSetpoint(setPointCorrection);
+            //dsm->hp->setTemperature(setPointCorrection);
+            //device_set_point->publish_state(setPointCorrection);
             break;
         }
         case climate::CLIMATE_ACTION_COOLING: {
@@ -1105,11 +971,14 @@ void MitsubishiHeatPump::run_workflows() {
             if (setPointCorrection - this->current_temperature > hysterisisUnderOff ||
                     this->same_float(this->pidController->getOutputMax(), setPointCorrection)) {
                 ESP_LOGI(TAG, "Turn off cooling!");
-                this->internalTurnOff();
+                if (this->dsm->internalTurnOff()) {
+                    internal_power_on->publish_state(this->dsm->isInternalPowerOn());
+                }
                 return;
             }
 
-            this.updateCoolingSetpoint(setPointCorrection);
+            //dsm->hp->setTemperature(setPointCorrection);
+            //device_set_point->publish_state(setPointCorrection);
             break;
         }
         case climate::CLIMATE_ACTION_IDLE: {
@@ -1121,19 +990,24 @@ void MitsubishiHeatPump::run_workflows() {
                 if (this->current_temperature - setPointCorrection > hysterisisUnderOff ||
                         this->same_float(setPointCorrection, this->pidController->getOutputMin())) {
                     ESP_LOGI(TAG, "Turn off while idling heat!");
-                    this->internalTurnOff();
+                    if (this->dsm->internalTurnOff()) {
+                        internal_power_on->publish_state(this->dsm->isInternalPowerOn());
+                    }
                     return;
                 }
             } else if (this->mode == climate::CLIMATE_MODE_COOL) {
                 if (setPointCorrection - this->current_temperature > hysterisisUnderOff ||
                         this->same_float(this->pidController->getOutputMax(), setPointCorrection)) {
                     ESP_LOGI(TAG, "Turn off while idling cool!");
-                    this->internalTurnOff();
+                    if (this->dsm->internalTurnOff()) {
+                        internal_power_on->publish_state(this->dsm->isInternalPowerOn());
+                    }
                     return;
                 }
             }
 
-            //this.updateCoolingSetpoint(setPointCorrection);
+            //dsm->hp->setTemperature(setPointCorrection);
+            //device_set_point->publish_state(setPointCorrection);
             break;
         }
         default: {
@@ -1149,7 +1023,9 @@ void MitsubishiHeatPump::run_workflows() {
                 }
 
                 ESP_LOGI(TAG, "Turning on Workflow heat");
-                this->internalTurnOn();
+                if (this->dsm->internalTurnOn()) {
+                    internal_power_on->publish_state(this->dsm->isInternalPowerOn());
+                }
             } else if (this->mode == climate::CLIMATE_MODE_COOL) {
                 const float delta = setPointCorrection - this->current_temperature;
                 ESP_LOGI(TAG, "Device off on cool: delta={%f} current={%f} setPointCorrection={%f}", delta, this->current_temperature, setPointCorrection);
@@ -1158,7 +1034,9 @@ void MitsubishiHeatPump::run_workflows() {
                 }
 
                 ESP_LOGI(TAG, "Turning on Workflow cool");
-                this->internalTurnOn();
+                if (this->dsm->internalTurnOn()) {
+                    internal_power_on->publish_state(this->dsm->isInternalPowerOn());
+                }
             } else {
                 ESP_LOGI(TAG, "Device off on other: current={%f} setPointCorrection={%f}", this->current_temperature, setPointCorrection);
             }

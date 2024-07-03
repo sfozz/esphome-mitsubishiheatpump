@@ -15,8 +15,6 @@
  * - ESPHome 1.19.1 or greater
  */
 
-#define USE_CALLBACKS
-
 #include "esphome.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/select/select.h"
@@ -25,6 +23,7 @@
 #include <chrono>
 
 #include "pidcontroller.h"
+#include "devicestate.h"
 
 #include "HeatPump.h"
 
@@ -73,6 +72,7 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         esphome::binary_sensor::BinarySensor* device_state_initialized;
         esphome::binary_sensor::BinarySensor* device_status_operating;
         esphome::sensor::Sensor* pid_set_point_correction;
+        esphome::sensor::Sensor* device_set_point;
 
         // Print a banner with library information.
         void banner();
@@ -86,11 +86,8 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         // Set the TX pin. Must be called before setup() to have any effect.
         void set_tx_pin(int);
 
-        // handle a change in settings as detected by the HeatPump library.
-        void hpSettingsChanged();
-
-        // Handle a change in status as detected by the HeatPump library.
-        void hpStatusChanged(heatpumpStatus currentStatus);
+        // handle a change in device;
+        void updateDevice();
 
         // Set up the component, initializing the HeatPump object.
         void setup() override;
@@ -140,7 +137,7 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
 
     protected:
         // HeatPump object using the underlying Arduino library.
-        HeatPump* hp;
+        devicestate::DeviceStateManager* dsm;
 
         // The ClimateTraits supported by this HeatPump.
         esphome::climate::ClimateTraits traits_;
@@ -185,8 +182,6 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         void on_horizontal_swing_change(const std::string &swing);
         void on_vertical_swing_change(const std::string &swing);
 
-        static void log_packet(byte* packet, unsigned int length, char* packetDirection);
-
     private:
         void enforce_remote_temperature_sensor_timeout();
 
@@ -204,9 +199,6 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         std::optional<std::chrono::time_point<std::chrono::steady_clock>> last_remote_temperature_sensor_update_;
         std::optional<std::chrono::time_point<std::chrono::steady_clock>> last_ping_request_;
 
-        bool settingsUpdated = false;
-        bool statusUpdated = false;
-
         bool same_float(const float left, const float right);
 
         PIDController *pidController;
@@ -216,12 +208,6 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         void run_workflows();
 
         bool isComponentActive();
-       
-        uint32_t lastInternalPowerUpdate = esphome::millis();
-        bool internalPowerOn = false;
-        bool initializedState = false;
-        void internalTurnOn();
-        void internalTurnOff();
 };
 
 #endif
