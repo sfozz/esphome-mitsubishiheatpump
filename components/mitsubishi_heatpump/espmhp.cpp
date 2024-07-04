@@ -39,9 +39,13 @@ MitsubishiHeatPump::MitsubishiHeatPump(
     hw_serial_{hw_serial}
 {
     internal_power_on = new esphome::binary_sensor::BinarySensor();
+    device_state_connected = new esphome::binary_sensor::BinarySensor();
     device_state_active = new esphome::binary_sensor::BinarySensor();
-    device_state_initialized = new esphome::binary_sensor::BinarySensor();
+    device_state_last_updated = new esphome::sensor::Sensor();
     device_status_operating = new esphome::binary_sensor::BinarySensor();
+    device_status_compressor_frequency = new esphome::sensor::Sensor();
+    device_status_compressor_frequency->set_device_class("frequency");
+    device_status_last_updated = new esphome::sensor::Sensor();
     pid_set_point_correction = new esphome::sensor::Sensor();
     pid_set_point_correction->set_unit_of_measurement("°C");
     pid_set_point_correction->set_accuracy_decimals(1);
@@ -737,7 +741,15 @@ void MitsubishiHeatPump::setup() {
     }
 
     ESP_LOGCONFIG(TAG, "Initializing new HeatPump object.");
-    this->dsm = new devicestate::DeviceStateManager();
+    this->dsm = new devicestate::DeviceStateManager(
+        this->internal_power_on,
+        this->device_state_connected,
+        this->device_state_active,
+        this->device_state_last_updated,
+        this->device_status_operating,
+        this->device_status_compressor_frequency,
+        this->device_status_last_updated
+    );
 
     ESP_LOGCONFIG(
             TAG,
@@ -869,7 +881,7 @@ void MitsubishiHeatPump::dump_heat_pump_details(const devicestate::DeviceState& 
     heatpumpStatus currentStatus = dsm->hp->getStatus();
     ESP_LOGI(TAG, "  roomTemperature: %f", currentStatus.roomTemperature);
     ESP_LOGI(TAG, "  operating: %s", TRUEFALSE(currentStatus.operating));
-    //ESP_LOGI(TAG, "  compressorFrequency: %f", currentStatus.compressorFrequency);
+    ESP_LOGI(TAG, "  compressorFrequency: %f", currentStatus.compressorFrequency);
 
     /*
     struct heatpumpSettings {

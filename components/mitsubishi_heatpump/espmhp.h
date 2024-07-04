@@ -68,9 +68,12 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         );
 
         esphome::binary_sensor::BinarySensor* internal_power_on;
+        esphome::binary_sensor::BinarySensor* device_state_connected;
         esphome::binary_sensor::BinarySensor* device_state_active;
-        esphome::binary_sensor::BinarySensor* device_state_initialized;
+        esphome::sensor::Sensor* device_state_last_updated;
         esphome::binary_sensor::BinarySensor* device_status_operating;
+        esphome::sensor::Sensor* device_status_compressor_frequency;
+        esphome::sensor::Sensor* device_status_last_updated;
         esphome::sensor::Sensor* pid_set_point_correction;
         esphome::sensor::Sensor* device_set_point;
 

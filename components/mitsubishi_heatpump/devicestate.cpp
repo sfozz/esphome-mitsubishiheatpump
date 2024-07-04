@@ -9,7 +9,8 @@ namespace devicestate {
 
     bool deviceStatusEqual(DeviceStatus left, DeviceStatus right) {
         return left.operating == right.operating &&
-        same_float(left.currentTemperature, right.currentTemperature, 0.1);
+        same_float(left.currentTemperature, right.currentTemperature, 0.1) &&
+        left.compressorFrequency == right.compressorFrequency;
     }
 
     bool deviceStateEqual(DeviceState left, DeviceState right) {
@@ -138,6 +139,7 @@ namespace devicestate {
         DeviceStatus deviceStatus;
         deviceStatus.currentTemperature = currentStatus->roomTemperature;
         deviceStatus.operating = currentStatus->operating;
+        deviceStatus.compressorFrequency = currentStatus->compressorFrequency;
         return deviceStatus;
     }
 
@@ -160,7 +162,26 @@ namespace devicestate {
         return deviceState;
     }
 
-    DeviceStateManager::DeviceStateManager() {
+    DeviceStateManager::DeviceStateManager(
+      esphome::binary_sensor::BinarySensor* internal_power_on,
+      esphome::binary_sensor::BinarySensor* device_state_connected,
+      esphome::binary_sensor::BinarySensor* device_state_active,
+      esphome::sensor::Sensor* device_state_last_updated,
+      esphome::binary_sensor::BinarySensor* device_status_operating,
+      esphome::sensor::Sensor* device_status_compressor_frequency,
+      esphome::sensor::Sensor* device_status_last_updated
+    ) {
+        this->internal_power_on = internal_power_on;
+        this->device_state_connected = device_state_connected;
+        this->device_state_active = device_state_active;
+        this->device_state_last_updated = device_state_last_updated;
+        this->device_status_operating = device_status_operating;
+        this->device_status_compressor_frequency = device_status_compressor_frequency;
+        this->device_status_last_updated = device_status_last_updated;
+
+        this->deviceStateLastUpdated = 0;
+        this->deviceStatusLastUpdated = 0;
+
         ESP_LOGCONFIG(TAG, "Initializing new HeatPump object.");
         this->hp = new HeatPump();
 
@@ -210,8 +231,13 @@ namespace devicestate {
             }
             this->settingsInitialized = true;
         }
-
         this->deviceState = deviceState;
+
+        this->device_state_connected->publish_state(this->deviceState.connected);
+        this->device_state_active->publish_state(this->deviceState.active);
+
+        this->deviceStateLastUpdated += 1;
+        this->device_state_last_updated->publish_state(this->deviceStateLastUpdated);
     }
 
     /**
@@ -223,6 +249,12 @@ namespace devicestate {
         }
         this->statusInitialized = true;
         this->deviceStatus = devicestate::toDeviceStatus(&currentStatus);
+
+        this->device_status_operating->publish_state(this->deviceStatus.operating);
+        this->device_status_compressor_frequency->publish_state(this->deviceStatus.compressorFrequency);
+
+        this->deviceStatusLastUpdated += 1;
+        this->device_status_last_updated->publish_state(this->deviceStatusLastUpdated);
     }
 
     void DeviceStateManager::log_packet(byte* packet, unsigned int length, char* packetDirection) {
@@ -285,15 +317,32 @@ namespace devicestate {
         this->turnOn("FAN");
     }
 
-    void DeviceStateManager::turnOn(const char* mode) {
+    bool DeviceStateManager::turnOn(const char* mode) {
         this->hp->setModeSetting(mode);
         this->hp->setPowerSetting("ON");
-        this->internalPowerOn = true;
+
+        if (this->hp->update()) {
+            this->internalPowerOn = true;
+            this->internal_power_on->publish_state(this->internalPowerOn);
+            ESP_LOGW(TAG, "Performed turn on!");
+            return true;
+        } else {
+            ESP_LOGW(TAG, "Failed to perform turn on!");
+            return false;
+        }
     }
 
-    void DeviceStateManager::turnOff() {
+    bool DeviceStateManager::turnOff() {
         this->hp->setPowerSetting("OFF");
-        this->internalPowerOn = false;
+        if (this->hp->update()) {
+            this->internalPowerOn = false;
+            this->internal_power_on->publish_state(this->internalPowerOn);
+            ESP_LOGW(TAG, "Performed turn off!");
+            return true;
+        } else {
+            ESP_LOGW(TAG, "Failed to perform turn off!");
+            return false;
+        }
     }
 
     bool DeviceStateManager::internalTurnOn() {
@@ -310,6 +359,7 @@ namespace devicestate {
         if (this->hp->update()) {
             this->lastInternalPowerUpdate = end;
             this->internalPowerOn = true;
+            this->internal_power_on->publish_state(this->internalPowerOn);
             ESP_LOGW(TAG, "Performed internal turn on!");
             return true;
         } else {
@@ -332,6 +382,7 @@ namespace devicestate {
         if (this->hp->update()) {
             this->lastInternalPowerUpdate = end;
             this->internalPowerOn = false;
+            this->internal_power_on->publish_state(this->internalPowerOn);
             ESP_LOGW(TAG, "Performed internal turn off!");
             return true;
         } else {

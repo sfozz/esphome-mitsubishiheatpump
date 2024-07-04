@@ -22,11 +22,17 @@ from esphome.core import CORE, coroutine
 AUTO_LOAD = ["climate", "select", "binary_sensor"]
 
 CONF_SUPPORTS = "supports"
+
 CONF_INTERNAL_POWER_ON = "internal_power_on"
+CONF_DEVICE_STATE_CONNECTED = "device_state_connected"
 CONF_DEVICE_STATE_ACTIVE = "device_state_active"
+CONF_DEVICE_STATE_LAST_UPDATED = "device_state_last_updated"
 CONF_DEVICE_STATUS_OPERATING = "device_status_operating"
+CONF_DEVICE_STATUS_COMPRESSOR_FREQUENCY = "device_status_compressor_frequency"
+CONF_DEVICE_STATUS_LAST_UPDATED = "device_status_last_updated"
 CONF_PID_SET_POINT_CORRECTION = "pid_set_point_correction"
 CONF_DEVICE_SET_POINT = "device_set_point"
+
 CONF_HORIZONTAL_SWING_SELECT = "horizontal_vane_select"
 CONF_VERTICAL_SWING_SELECT = "vertical_vane_select"
 DEFAULT_CLIMATE_MODES = ["HEAT_COOL", "COOL", "HEAT", "DRY", "FAN_ONLY"]
@@ -56,16 +62,28 @@ MitsubishiACSelect = cg.global_ns.class_(
     "MitsubishiACSelect", select.Select, cg.Component
 )
 
-InternalPowerOn = cg.global_ns.class_(
+""" InternalPowerOn = cg.global_ns.class_(
     "InternalPowerOn", binary_sensor.BinarySensor, cg.Component
+)
+
+DeviceStateConnected = cg.global_ns.class_(
+    "DeviceStateConnected", binary_sensor.BinarySensor, cg.Component
 )
 
 DeviceStateActive = cg.global_ns.class_(
     "DeviceStateActive", binary_sensor.BinarySensor, cg.Component
 )
 
+DeviceStateLastUpdated = cg.global_ns.class_(
+    "DeviceStateLastUpdated", sensor.Sensor, cg.Component
+)
+
 DeviceStatusOperating = cg.global_ns.class_(
     "DeviceStatusOperating", binary_sensor.BinarySensor, cg.Component
+)
+
+DeviceStatusLastUpdated = cg.global_ns.class_(
+    "DeviceStatusLastUpdated", sensor.Sensor, cg.Component
 )
 
 PIDSetPointCorrection = cg.global_ns.class_(
@@ -74,7 +92,7 @@ PIDSetPointCorrection = cg.global_ns.class_(
 
 DeviceSetPoint = cg.global_ns.class_(
     "DeviceSetPoint", sensor.Sensor, cg.Component
-)
+) """
 
 def valid_uart(uart):
     if CORE.is_esp8266:
@@ -95,11 +113,27 @@ INTERNAL_POWER_ON_SCHEMA = binary_sensor.binary_sensor_schema(binary_sensor.Bina
     entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
 )
 
+DEVICE_STATE_CONNECTED_SCHEMA = binary_sensor.binary_sensor_schema(binary_sensor.BinarySensor,
+    entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
+)
+
 DEVICE_STATE_ACTIVE_SCHEMA = binary_sensor.binary_sensor_schema(binary_sensor.BinarySensor,
     entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
 )
 
+DEVICE_STATE_LAST_UPDATED_SCHEMA = sensor.sensor_schema(sensor.Sensor,
+    entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
+)
+
 DEVICE_STATUS_OPERATING_SCHEMA = binary_sensor.binary_sensor_schema(binary_sensor.BinarySensor,
+    entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
+)
+
+DEVICE_STATUS_COMPRESSOR_FREQUENCY_SCHEMA = sensor.sensor_schema(sensor.Sensor,
+    entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
+)
+
+DEVICE_STATUS_LAST_UPDATED_SCHEMA = sensor.sensor_schema(sensor.Sensor,
     entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
 )
 
@@ -116,14 +150,34 @@ INTERNAL_POWER_ON_DEFAULT = INTERNAL_POWER_ON_SCHEMA({
     CONF_NAME: "Internal power on"
 })
 
+DEVICE_STATE_CONNECTED_DEFAULT = DEVICE_STATE_CONNECTED_SCHEMA({
+    CONF_ID: "device_state_connected",
+    CONF_NAME: "Device state connected"
+})
+
 DEVICE_STATE_ACTIVE_DEFAULT = DEVICE_STATE_ACTIVE_SCHEMA({
     CONF_ID: "device_state_active",
     CONF_NAME: "Device state active"
 })
 
+DEVICE_STATE_LAST_UPDATED_DEFAULT = DEVICE_STATE_LAST_UPDATED_SCHEMA({
+    CONF_ID: "device_state_last_updated",
+    CONF_NAME: "Device state last updated"
+})
+
 DEVICE_STATUS_OPERATING_DEFAULT = DEVICE_STATUS_OPERATING_SCHEMA({
     CONF_ID: "device_status_operating",
     CONF_NAME: "Device status operating"
+})
+
+DEVICE_STATUS_COMPRESSOR_FREQUENCY_DEFAULT = DEVICE_STATUS_COMPRESSOR_FREQUENCY_SCHEMA({
+    CONF_ID: "device_status_compressor_frequency",
+    CONF_NAME: "Device status compressor frequency"
+})
+
+DEVICE_STATUS_LAST_UPDATED_DEFAULT = DEVICE_STATUS_LAST_UPDATED_SCHEMA({
+    CONF_ID: "device_status_last_updated",
+    CONF_NAME: "Device status last updated"
 })
 
 PID_SET_POINT_CORRECTION_DEFAULT = PID_SET_POINT_CORRECTION_SCHEMA({
@@ -137,8 +191,12 @@ DEVICE_SET_POINT_DEFAULT = DEVICE_SET_POINT_SCHEMA({
 })
 
 INTERNAL_POWER_ON_DEFAULT[CONF_INTERNAL] = False
+DEVICE_STATE_CONNECTED_DEFAULT[CONF_INTERNAL] = False
 DEVICE_STATE_ACTIVE_DEFAULT[CONF_INTERNAL] = False
+DEVICE_STATE_LAST_UPDATED_DEFAULT[CONF_INTERNAL] = False
 DEVICE_STATUS_OPERATING_DEFAULT[CONF_INTERNAL] = False
+DEVICE_STATUS_COMPRESSOR_FREQUENCY_DEFAULT[CONF_INTERNAL] = False
+DEVICE_STATUS_LAST_UPDATED_DEFAULT[CONF_INTERNAL] = False
 PID_SET_POINT_CORRECTION_DEFAULT[CONF_INTERNAL] = False
 DEVICE_SET_POINT_DEFAULT[CONF_INTERNAL] = False
 
@@ -161,8 +219,12 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
         cv.Optional(CONF_HORIZONTAL_SWING_SELECT): SELECT_SCHEMA,
         cv.Optional(CONF_VERTICAL_SWING_SELECT): SELECT_SCHEMA,
         cv.Optional(CONF_INTERNAL_POWER_ON, default=INTERNAL_POWER_ON_DEFAULT): INTERNAL_POWER_ON_SCHEMA,
+        cv.Optional(CONF_DEVICE_STATE_CONNECTED, default=DEVICE_STATE_CONNECTED_DEFAULT): DEVICE_STATE_CONNECTED_SCHEMA,
         cv.Optional(CONF_DEVICE_STATE_ACTIVE, default=DEVICE_STATE_ACTIVE_DEFAULT): DEVICE_STATE_ACTIVE_SCHEMA,
+        cv.Optional(CONF_DEVICE_STATE_LAST_UPDATED, default=DEVICE_STATE_LAST_UPDATED_DEFAULT): DEVICE_STATE_LAST_UPDATED_SCHEMA,
         cv.Optional(CONF_DEVICE_STATUS_OPERATING, default=DEVICE_STATUS_OPERATING_DEFAULT): DEVICE_STATUS_OPERATING_SCHEMA,
+        cv.Optional(CONF_DEVICE_STATUS_COMPRESSOR_FREQUENCY, default=DEVICE_STATUS_COMPRESSOR_FREQUENCY_DEFAULT): DEVICE_STATUS_COMPRESSOR_FREQUENCY_SCHEMA,
+        cv.Optional(CONF_DEVICE_STATUS_LAST_UPDATED, default=DEVICE_STATUS_LAST_UPDATED_DEFAULT): DEVICE_STATUS_LAST_UPDATED_SCHEMA,
         cv.Optional(CONF_PID_SET_POINT_CORRECTION, default=PID_SET_POINT_CORRECTION_DEFAULT): PID_SET_POINT_CORRECTION_SCHEMA,
         cv.Optional(CONF_DEVICE_SET_POINT, default=DEVICE_SET_POINT_DEFAULT): DEVICE_SET_POINT_SCHEMA,
 
@@ -236,8 +298,12 @@ def to_code(config):
     yield cg.register_component(var, config)
     yield climate.register_climate(var, config)
     yield binary_sensor.register_binary_sensor(var.internal_power_on, config[CONF_INTERNAL_POWER_ON])
+    yield binary_sensor.register_binary_sensor(var.device_state_connected, config[CONF_DEVICE_STATE_CONNECTED])
     yield binary_sensor.register_binary_sensor(var.device_state_active, config[CONF_DEVICE_STATE_ACTIVE])
+    yield sensor.register_sensor(var.device_state_last_updated, config[CONF_DEVICE_STATE_LAST_UPDATED])
     yield binary_sensor.register_binary_sensor(var.device_status_operating, config[CONF_DEVICE_STATUS_OPERATING])
+    yield sensor.register_sensor(var.device_status_compressor_frequency, config[CONF_DEVICE_STATUS_COMPRESSOR_FREQUENCY])
+    yield sensor.register_sensor(var.device_status_last_updated, config[CONF_DEVICE_STATUS_LAST_UPDATED])
     yield sensor.register_sensor(var.pid_set_point_correction, config[CONF_PID_SET_POINT_CORRECTION])
     yield sensor.register_sensor(var.device_set_point, config[CONF_DEVICE_SET_POINT])
 
