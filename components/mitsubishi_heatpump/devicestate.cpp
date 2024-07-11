@@ -24,28 +24,6 @@ namespace devicestate {
         left.connected == right.connected;
     }
 
-    // Function to convert a Color enum value to its string 
-    // representation 
-    const char* deviceModeToString(DeviceMode mode) 
-    { 
-        switch (mode) {
-            case DeviceMode::DeviceMode_Off:
-            return "Off";
-            case DeviceMode::DeviceMode_Heat:
-            return "Heat";
-            case DeviceMode::DeviceMode_Cool:
-            return "Cool";
-            case DeviceMode::DeviceMode_Dry:
-            return "Dry";
-            case DeviceMode::DeviceMode_Fan:
-            return "Fan";
-            case DeviceMode::DeviceMode_Auto:
-            return "Auto";
-            default:
-            return "Unknown";
-        }
-    } 
-
     bool isDeviceActive(heatpumpSettings *currentSettings) {
         return strcmp(currentSettings->power, "ON") == 0;
     }
@@ -83,6 +61,28 @@ namespace devicestate {
         }
     }
 
+    const char* verticalSwingModeToString(VerticalSwingMode mode) {
+        switch(mode) {
+            case VerticalSwingMode::VerticalSwingMode_Swing:
+                return "SWING";
+            case VerticalSwingMode::VerticalSwingMode_Auto:
+                return "AUTO";
+            case VerticalSwingMode::VerticalSwingMode_Up:
+                return "1";
+            case VerticalSwingMode::VerticalSwingMode_UpCenter:
+                return "2";
+            case VerticalSwingMode::VerticalSwingMode_Center:
+                return "3";
+            case VerticalSwingMode::VerticalSwingMode_DownCenter:
+                return "4";
+            case VerticalSwingMode::VerticalSwingMode_Down:
+                return "5";
+            default:
+                ESP_LOGW(TAG, "Invalid vertical vane position %d", mode);
+                return "UNKNOWN";
+        }
+    }
+
     HorizontalSwingMode toHorizontalSwingMode(heatpumpSettings *currentSettings) {
         if (strcmp(currentSettings->wideVane, "SWING") == 0) {
             return HorizontalSwingMode::HorizontalSwingMode_Swing;
@@ -100,6 +100,28 @@ namespace devicestate {
             return HorizontalSwingMode::HorizontalSwingMode_Right;
         } else {
             return HorizontalSwingMode::HorizontalSwingMode_Off;
+        }
+    }
+
+    const char* horizontalSwingModeToString(HorizontalSwingMode mode) {
+        switch(mode) {
+            case HorizontalSwingMode::HorizontalSwingMode_Swing:
+                return "SWING";
+            case HorizontalSwingMode::HorizontalSwingMode_Auto:
+                return "<>";
+            case HorizontalSwingMode::HorizontalSwingMode_Left:
+                return "<<";
+            case HorizontalSwingMode::HorizontalSwingMode_LeftCenter:
+                return "<";
+            case HorizontalSwingMode::HorizontalSwingMode_Center:
+                return "|";
+            case HorizontalSwingMode::HorizontalSwingMode_RightCenter:
+                return ">";
+            case HorizontalSwingMode::HorizontalSwingMode_Right:
+                return ">>";
+            default:
+                ESP_LOGW(TAG, "Invalid horizontal vane position %d", mode);
+                return "UNKNOWN";
         }
     }
 
@@ -131,7 +153,29 @@ namespace devicestate {
         } else if (strcmp(currentSettings->mode, "AUTO") == 0) {
             return DeviceMode::DeviceMode_Auto;
         } else {
+            ESP_LOGW(TAG, "Invalid device mode %s", currentSettings->mode);
             return DeviceMode::DeviceMode_Unknown;
+        }
+    }
+
+    // Function to convert a Color enum value to its string 
+    // representation 
+    const char* deviceModeToString(DeviceMode mode) 
+    { 
+        switch (mode) {
+            case DeviceMode::DeviceMode_Heat:
+            return "HEAT";
+            case DeviceMode::DeviceMode_Cool:
+            return "COOL";
+            case DeviceMode::DeviceMode_Dry:
+            return "DRY";
+            case DeviceMode::DeviceMode_Fan:
+            return "FAN";
+            case DeviceMode::DeviceMode_Auto:
+            return "AUTO";
+            default:
+            ESP_LOGW(TAG, "Invalid device mode %d", mode);
+            return "FAN";
         }
     }
 
@@ -166,6 +210,7 @@ namespace devicestate {
       esphome::binary_sensor::BinarySensor* internal_power_on,
       esphome::binary_sensor::BinarySensor* device_state_connected,
       esphome::binary_sensor::BinarySensor* device_state_active,
+      esphome::sensor::Sensor* device_set_point,
       esphome::sensor::Sensor* device_state_last_updated,
       esphome::binary_sensor::BinarySensor* device_status_operating,
       esphome::sensor::Sensor* device_status_compressor_frequency,
@@ -174,6 +219,7 @@ namespace devicestate {
         this->internal_power_on = internal_power_on;
         this->device_state_connected = device_state_connected;
         this->device_state_active = device_state_active;
+        this->device_set_point = device_set_point;
         this->device_state_last_updated = device_state_last_updated;
         this->device_status_operating = device_status_operating;
         this->device_status_compressor_frequency = device_status_compressor_frequency;
@@ -206,6 +252,9 @@ namespace devicestate {
 
     void DeviceStateManager::hpSettingsChanged() {
         heatpumpSettings currentSettings = hp->getSettings();
+        ESP_LOGI(TAG, "Heatpump Settings Changed:");
+        log_heatpump_settings(currentSettings);
+
         if (currentSettings.power == NULL) {
             /*
             * We should always get a valid pointer here once the HeatPump
@@ -235,6 +284,7 @@ namespace devicestate {
 
         this->device_state_connected->publish_state(this->deviceState.connected);
         this->device_state_active->publish_state(this->deviceState.active);
+        this->device_set_point->publish_state(this->deviceState.targetTemperature);
 
         this->deviceStateLastUpdated += 1;
         this->device_state_last_updated->publish_state(this->deviceStateLastUpdated);
@@ -286,6 +336,7 @@ namespace devicestate {
         // This will be called every "update_interval" milliseconds.
         //this->dump_config();
         this->hp->sync();
+        
     #ifndef USE_CALLBACKS
         this->hpSettingsChanged();
         heatpumpStatus currentStatus = hp->getStatus();
@@ -298,54 +349,48 @@ namespace devicestate {
     }
 
     void DeviceStateManager::setCool() {
-        this->turnOn("COOL");
+        this->turnOn(DeviceMode::DeviceMode_Cool);
     }
 
     void DeviceStateManager::setHeat() {
-        this->turnOn("HEAT");
+        this->turnOn(DeviceMode::DeviceMode_Heat);
     }
 
     void DeviceStateManager::setDry() {
-        this->turnOn("DRY");
+        this->turnOn(DeviceMode::DeviceMode_Dry);
     }
 
     void DeviceStateManager::setAuto() {
-        this->turnOn("AUTO");
+        this->turnOn(DeviceMode::DeviceMode_Auto);
     }
 
     void DeviceStateManager::setFan() {
-        this->turnOn("FAN");
+        this->turnOn(DeviceMode::DeviceMode_Fan);
     }
 
-    bool DeviceStateManager::turnOn(const char* mode) {
-        this->hp->setModeSetting(mode);
+    void DeviceStateManager::turnOn(DeviceMode mode) {
+        const char* deviceMode = deviceModeToString(mode);
+
+        this->hp->setModeSetting(deviceMode);
         this->hp->setPowerSetting("ON");
-
-        if (this->hp->update()) {
-            this->internalPowerOn = true;
-            this->internal_power_on->publish_state(this->internalPowerOn);
-            ESP_LOGW(TAG, "Performed turn on!");
-            return true;
-        } else {
-            ESP_LOGW(TAG, "Failed to perform turn on!");
-            return false;
-        }
+        this->internalPowerOn = true;
+        this->internal_power_on->publish_state(this->internalPowerOn);
     }
 
-    bool DeviceStateManager::turnOff() {
+    void DeviceStateManager::turnOff() {
         this->hp->setPowerSetting("OFF");
-        if (this->hp->update()) {
-            this->internalPowerOn = false;
-            this->internal_power_on->publish_state(this->internalPowerOn);
-            ESP_LOGW(TAG, "Performed turn off!");
-            return true;
-        } else {
-            ESP_LOGW(TAG, "Failed to perform turn off!");
-            return false;
-        }
+        this->internalPowerOn = false;
+        this->internal_power_on->publish_state(this->internalPowerOn);
     }
 
     bool DeviceStateManager::internalTurnOn() {
+        if (!this->isInitialized()) {
+            ESP_LOGW(TAG, "Cannot change internal power on until initialized");
+            return false;
+        }
+
+        const char* deviceMode = deviceModeToString(this->deviceState.mode);
+
         const uint32_t end = esphome::millis();
         const int durationInMilliseconds = end - this->lastInternalPowerUpdate;
         const int durationInSeconds = durationInMilliseconds / 1000;
@@ -355,8 +400,9 @@ namespace devicestate {
             return false;
         }
 
+        this->hp->setModeSetting(deviceMode);
         this->hp->setPowerSetting("ON");
-        if (this->hp->update()) {
+        if (this->commit()) {
             this->lastInternalPowerUpdate = end;
             this->internalPowerOn = true;
             this->internal_power_on->publish_state(this->internalPowerOn);
@@ -369,6 +415,11 @@ namespace devicestate {
     }
 
     bool DeviceStateManager::internalTurnOff() {
+        if (!this->isInitialized()) {
+            ESP_LOGW(TAG, "Cannot change internal power off until initialized");
+            return false;
+        }
+
         const uint32_t end = esphome::millis();
         const int durationInMilliseconds = end - this->lastInternalPowerUpdate;
         const int durationInSeconds = durationInMilliseconds / 1000;
@@ -379,7 +430,7 @@ namespace devicestate {
         }
 
         this->hp->setPowerSetting("OFF");
-        if (this->hp->update()) {
+        if (this->commit()) {
             this->lastInternalPowerUpdate = end;
             this->internalPowerOn = false;
             this->internal_power_on->publish_state(this->internalPowerOn);
@@ -389,5 +440,111 @@ namespace devicestate {
             ESP_LOGW(TAG, "Failed to perform internal turn off!");
             return false;
         }
+    }
+
+    bool DeviceStateManager::setVerticalSwingMode(VerticalSwingMode mode) {
+        return this->setVerticalSwingMode(mode, true);
+    }
+
+    bool DeviceStateManager::setVerticalSwingMode(VerticalSwingMode mode, bool commit) {
+        const char* newMode = verticalSwingModeToString(mode);
+        if (mode == this->deviceState.verticalSwingMode) {
+            const char* oldMode = verticalSwingModeToString(this->deviceState.verticalSwingMode);
+            ESP_LOGW(TAG, "Did not update vertical swing mode due to value: %s (%s)", newMode, oldMode);
+            return false;
+        }
+
+        if (strcmp(newMode,"UNKNOWN") == 0) {
+            ESP_LOGW(TAG, "Did not update vertical swing mode due to invalid value: %s", newMode);
+            return false;
+        }
+
+        this->hp->setVaneSetting(newMode);
+        if (!commit) {
+            return true;
+        }
+
+        if (this->commit()) {
+            ESP_LOGW(TAG, "Performed set vertical swing mode!");
+            return true;
+        } else {
+            ESP_LOGW(TAG, "Failed to perform set vertical swing mode!");
+            return false;
+        }
+    }
+
+    bool DeviceStateManager::setHorizontalSwingMode(HorizontalSwingMode mode) {
+        return this->setHorizontalSwingMode(mode, true);
+    }
+
+    bool DeviceStateManager::setHorizontalSwingMode(HorizontalSwingMode mode, bool commit) {
+        const char* newMode = horizontalSwingModeToString(mode);
+        if (mode == this->deviceState.horizontalSwingMode) {
+            const char* oldMode = horizontalSwingModeToString(this->deviceState.horizontalSwingMode);
+            ESP_LOGW(TAG, "Did not update horizontal swing mode due to value: %s (%s)", newMode, oldMode);
+            return false;
+        }
+
+        if (strcmp(newMode,"UNKNOWN") == 0) {
+            ESP_LOGW(TAG, "Did not update horizontal swing mode due to invalid value: %s", newMode);
+            return false;
+        }
+
+        this->hp->setWideVaneSetting(newMode);
+        if (!commit) {
+            return true;
+        }
+
+        if (this->commit()) {
+            ESP_LOGW(TAG, "Performed set horizontal swing mode!");
+            return true;
+        } else {
+            ESP_LOGW(TAG, "Failed to perform set horizontal swing mode!");
+            return false;
+        }
+    }
+
+    void DeviceStateManager::setTemperature(float value) {
+        this->hp->setTemperature(value);
+        //this->device_set_point->publish_state(value);
+    }
+
+    bool DeviceStateManager::commit() {
+        return this->hp->update();
+    }
+
+    void DeviceStateManager::log_heatpump_settings(heatpumpSettings currentSettings) {
+        ESP_LOGI(TAG, "  power: %s", currentSettings.power);
+        ESP_LOGI(TAG, "  mode: %s", currentSettings.mode);
+        ESP_LOGI(TAG, "  temperature: %f", currentSettings.temperature);
+        ESP_LOGI(TAG, "  fan: %s", currentSettings.fan);
+        ESP_LOGI(TAG, "  vane: %s", currentSettings.vane);
+        ESP_LOGI(TAG, "  wideVane: %s", currentSettings.wideVane);
+        ESP_LOGI(TAG, "  connected: %s", TRUEFALSE(currentSettings.connected));
+    }
+
+    void DeviceStateManager::dump_state() {
+        ESP_LOGI(TAG, "Internal State");
+        ESP_LOGI(TAG, "  active: %s", TRUEFALSE(this->isInternalPowerOn()));
+        /*
+        struct DeviceState {
+            bool active;
+            DeviceMode mode;
+            float targetTemperature;
+        };
+        */
+        ESP_LOGI(TAG, "Device State");
+        ESP_LOGI(TAG, "  active: %s", TRUEFALSE(this->deviceState.active));
+        ESP_LOGI(TAG, "  mode: %s", devicestate::deviceModeToString(this->deviceState.mode));
+        ESP_LOGI(TAG, "  targetTemperature: %f", this->deviceState.targetTemperature);
+
+        ESP_LOGI(TAG, "Heatpump Status");
+        ESP_LOGI(TAG, "  roomTemperature: %f", this->deviceStatus.currentTemperature);
+        ESP_LOGI(TAG, "  operating: %s", TRUEFALSE(this->deviceStatus.operating));
+        ESP_LOGI(TAG, "  compressorFrequency: %f", this->deviceStatus.compressorFrequency);
+        
+        ESP_LOGI(TAG, "Heatpump Settings");
+        heatpumpSettings currentSettings = this->hp->getSettings();
+        log_heatpump_settings(currentSettings);
     }
 }

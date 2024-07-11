@@ -126,7 +126,7 @@ void PIDController::setTarget(float target) {
 }
 
 void PIDController::resetState() {
-    this->outputSum = this->applyOutputLimits(0.0f);
+    this->outputSum = this->applyOutputLimits(this->target);
     this->lastInput.reset();
 }
 

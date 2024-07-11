@@ -47,9 +47,9 @@ static const float   ESPMHP_TARGET_TEMPERATURE_STEP = 0.5; // temperature settin
 static const float   ESPMHP_CURRENT_TEMPERATURE_STEP = 0.1; // temperature setting step,
                                                     // in degrees C
     
-static const float p = 4.0;
-static const float i = 0.02;
-static const float d = 0.2;
+static const float p = 0.005;
+static const float i = 0.0005;
+static const float d = 0.000;
 static const float hysterisisUnderOff = 1.0;
 
 class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::climate::Climate {
@@ -106,8 +106,6 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
 
         // print the current configuration
         void dump_config() override;
-
-        void dump_heat_pump_details(const devicestate::DeviceState& deviceState);
 
         // Debugging function to print the object's state.
         void dump_state();
@@ -214,6 +212,9 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
 
         devicestate::DeviceState lastDeviceState;
         devicestate::DeviceStatus lastDeviceStatus;
+
+        float min_temp;
+        float max_temp;
 };
 
 #endif

@@ -62,38 +62,6 @@ MitsubishiACSelect = cg.global_ns.class_(
     "MitsubishiACSelect", select.Select, cg.Component
 )
 
-""" InternalPowerOn = cg.global_ns.class_(
-    "InternalPowerOn", binary_sensor.BinarySensor, cg.Component
-)
-
-DeviceStateConnected = cg.global_ns.class_(
-    "DeviceStateConnected", binary_sensor.BinarySensor, cg.Component
-)
-
-DeviceStateActive = cg.global_ns.class_(
-    "DeviceStateActive", binary_sensor.BinarySensor, cg.Component
-)
-
-DeviceStateLastUpdated = cg.global_ns.class_(
-    "DeviceStateLastUpdated", sensor.Sensor, cg.Component
-)
-
-DeviceStatusOperating = cg.global_ns.class_(
-    "DeviceStatusOperating", binary_sensor.BinarySensor, cg.Component
-)
-
-DeviceStatusLastUpdated = cg.global_ns.class_(
-    "DeviceStatusLastUpdated", sensor.Sensor, cg.Component
-)
-
-PIDSetPointCorrection = cg.global_ns.class_(
-    "PIDSetPointCorrection", sensor.Sensor, cg.Component
-)
-
-DeviceSetPoint = cg.global_ns.class_(
-    "DeviceSetPoint", sensor.Sensor, cg.Component
-) """
-
 def valid_uart(uart):
     if CORE.is_esp8266:
         uarts = ["UART0"]  # UART1 is tx-only

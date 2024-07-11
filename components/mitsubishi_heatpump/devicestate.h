@@ -12,7 +12,6 @@
 
 namespace devicestate {
   enum DeviceMode {
-    DeviceMode_Off,
     DeviceMode_Heat,
     DeviceMode_Cool,
     DeviceMode_Dry,
@@ -21,6 +20,7 @@ namespace devicestate {
     DeviceMode_Unknown
   };
   DeviceMode toDeviceMode(heatpumpSettings *currentSettings);
+  const char* deviceModeToString(DeviceMode mode);
 
   enum FanMode {
     FanMode_Auto,
@@ -51,6 +51,7 @@ namespace devicestate {
     VerticalSwingMode_Off
   };
   VerticalSwingMode toVerticalSwingMode(heatpumpSettings *currentSettings);
+  const char* verticalSwingModeToString(VerticalSwingMode mode);
 
   enum HorizontalSwingMode {
     HorizontalSwingMode_Swing,
@@ -63,8 +64,7 @@ namespace devicestate {
     HorizontalSwingMode_Off
   };
   HorizontalSwingMode toHorizontalSwingMode(heatpumpSettings *currentSettings);
-
-  const char* deviceModeToString(DeviceMode mode);
+  const char* horizontalSwingModeToString(HorizontalSwingMode mode);
 
   struct DeviceStatus {
     bool operating;
@@ -92,6 +92,7 @@ namespace devicestate {
       esphome::binary_sensor::BinarySensor* internal_power_on;
       esphome::binary_sensor::BinarySensor* device_state_connected;
       esphome::binary_sensor::BinarySensor* device_state_active;
+      esphome::sensor::Sensor* device_set_point;
       esphome::sensor::Sensor* device_state_last_updated;
       esphome::binary_sensor::BinarySensor* device_status_operating;
       esphome::sensor::Sensor* device_status_compressor_frequency;
@@ -111,11 +112,13 @@ namespace devicestate {
       void hpSettingsChanged();
       void hpStatusChanged(heatpumpStatus currentStatus);
       static void log_packet(byte* packet, unsigned int length, char* packetDirection);
+
     public:
       DeviceStateManager(
         esphome::binary_sensor::BinarySensor* internal_power_on,
         esphome::binary_sensor::BinarySensor* device_state_connected,
         esphome::binary_sensor::BinarySensor* device_state_active,
+        esphome::sensor::Sensor* device_set_point,
         esphome::sensor::Sensor* device_state_last_updated,
         esphome::binary_sensor::BinarySensor* device_status_operating,
         esphome::sensor::Sensor* device_status_compressor_frequency,
@@ -137,12 +140,24 @@ namespace devicestate {
       void setDry();
       void setAuto();
       void setFan();
-      
-      bool turnOn(const char* mode);
-      bool turnOff();
+
+      bool setVerticalSwingMode(VerticalSwingMode mode);
+      bool setVerticalSwingMode(VerticalSwingMode mode, bool commit);
+      bool setHorizontalSwingMode(HorizontalSwingMode mode);
+      bool setHorizontalSwingMode(HorizontalSwingMode mode, bool commit);
+
+      bool commit();
+
+      void turnOn(DeviceMode mode);
+      void turnOff();
 
       bool internalTurnOn();
       bool internalTurnOff();
+
+      void setTemperature(float target);
+
+      void dump_state();
+      void log_heatpump_settings(heatpumpSettings currentSettings);
   };
 }
 #endif
