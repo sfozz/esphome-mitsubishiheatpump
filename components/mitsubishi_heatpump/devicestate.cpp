@@ -1,5 +1,8 @@
 #include "devicestate.h"
 
+#include "espmhp.h"
+using namespace esphome;
+
 namespace devicestate {
     static const char* TAG = "DeviceStateManager"; // Logging tag
 
@@ -253,7 +256,7 @@ namespace devicestate {
     void DeviceStateManager::hpSettingsChanged() {
         heatpumpSettings currentSettings = hp->getSettings();
         ESP_LOGI(TAG, "Heatpump Settings Changed:");
-        log_heatpump_settings(currentSettings);
+        this->log_heatpump_settings(currentSettings);
 
         if (currentSettings.power == NULL) {
             /*
@@ -545,6 +548,6 @@ namespace devicestate {
         
         ESP_LOGI(TAG, "Heatpump Settings");
         heatpumpSettings currentSettings = this->hp->getSettings();
-        log_heatpump_settings(currentSettings);
+        this->log_heatpump_settings(currentSettings);
     }
 }

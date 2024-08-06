@@ -845,7 +845,8 @@ void MitsubishiHeatPump::run_workflows() {
                 return;
             }
 
-            if (this->current_temperature - deviceState.targetTemperature > hysterisisUnderOff) {
+            const float delta = this->current_temperature - deviceState.targetTemperature;
+            if (delta > hysterisisUnderOff) {
                 ESP_LOGI(TAG, "Turn off while heating: delta={%f} current={%f} targetTemperature={%f}", delta, this->current_temperature, deviceState.targetTemperature);
                 this->dsm->internalTurnOff();
                 return;
@@ -857,7 +858,8 @@ void MitsubishiHeatPump::run_workflows() {
                 return;
             }
 
-            if (deviceState.targetTemperature - this->current_temperature > hysterisisUnderOff) {
+            const float delta = deviceState.targetTemperature - this->current_temperature;
+            if (delta > hysterisisUnderOff) {
                 ESP_LOGI(TAG, "Turn off while cooling: delta={%f} current={%f} targetTemperature={%f}", delta, this->current_temperature, deviceState.targetTemperature);
                 this->dsm->internalTurnOff();
                 return;
