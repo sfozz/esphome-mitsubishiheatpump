@@ -46,9 +46,6 @@ MitsubishiHeatPump::MitsubishiHeatPump(
     device_status_compressor_frequency = new esphome::sensor::Sensor();
     device_status_compressor_frequency->set_device_class("frequency");
     device_status_last_updated = new esphome::sensor::Sensor();
-    pid_set_point_correction = new esphome::sensor::Sensor();
-    pid_set_point_correction->set_unit_of_measurement("°C");
-    pid_set_point_correction->set_accuracy_decimals(1);
     device_set_point = new esphome::sensor::Sensor();
     device_set_point->set_unit_of_measurement("°C");
     device_set_point->set_accuracy_decimals(1);
@@ -454,8 +451,6 @@ void MitsubishiHeatPump::updateDevice() {
 
     this->current_temperature = deviceStatus.currentTemperature;
     this->operating_ = deviceStatus.operating;
-    
-    this->ensure_pid_target();
 
     // We cannot use the internal state of the device initialize component state
     if (this->isComponentActive()) {
@@ -751,16 +746,6 @@ void MitsubishiHeatPump::setup() {
         this->max_temp = this->visual_max_temperature_override_.value();
     }
 
-    this->pidController = new PIDController(
-        p,
-        i,
-        d,
-        this->get_update_interval(),
-        (this->max_temp + this->min_temp) / 2.0, // Set target to mid point of min/max
-        this->min_temp,
-        this->max_temp
-    );
-
     // create various setpoint persistence:
     cool_storage = global_preferences->make_preference<uint8_t>(this->get_object_id_hash() + 1);
     heat_storage = global_preferences->make_preference<uint8_t>(this->get_object_id_hash() + 2);
@@ -829,29 +814,14 @@ bool MitsubishiHeatPump::same_float(const float left, const float right) {
     return fabs(left - right) <= 0.001;
 }
 
-void MitsubishiHeatPump::ensure_pid_target() {
-    if (this->target_temperature < this->min_temp) {
-        return;
-    }
-
-    if (!this->same_float(this->target_temperature, this->pidController->getTarget())) {
-        ESP_LOGI(TAG, "PID Target temp changing from %f to %f", this->pidController->getTarget(), this->target_temperature);
-        this->pidController->setTarget(this->target_temperature);
-    }
-}
-
 void MitsubishiHeatPump::update_setpoint(const float value) {
     if (this->same_float(this->target_temperature, value)) {
         ESP_LOGD(TAG, "Target temp unchanged: current={%f} updated={%f}", this->target_temperature, value);
-        this->ensure_pid_target();
         return;
     }
 
     ESP_LOGI(TAG, "Target temp changing from %f to %f", this->target_temperature, value);
     this->target_temperature = value;
-
-    ESP_LOGI(TAG, "PID Target temp changing from %f to %f", this->pidController->getTarget(), value);
-    this->pidController->setTarget(this->target_temperature);
 }
 
 void MitsubishiHeatPump::run_workflows() {
@@ -861,17 +831,6 @@ void MitsubishiHeatPump::run_workflows() {
         ESP_LOGW(TAG, "Skipping run workflow due to inactive state.");
         return;
     }
-
-    ESP_LOGD(TAG, "Check PID Target: %f", this->pidController->getTarget());
-    this->ensure_pid_target();
-    if (this->pidController->getTarget() < this->min_temp) {
-        ESP_LOGW(TAG, "Skipping run workflow due pid target 0.");
-        return;
-    }
-
-    const float setPointCorrection = this->pidController->update(this->current_temperature);
-    pid_set_point_correction->publish_state(setPointCorrection);
-    ESP_LOGD(TAG, "PIDController set point correction: %.1f", setPointCorrection);
 
     heatpumpSettings currentSettings = this->dsm->hp->getSettings();
     const DeviceState deviceState = devicestate::toDeviceState(&currentSettings);
@@ -886,15 +845,11 @@ void MitsubishiHeatPump::run_workflows() {
                 return;
             }
 
-            if (this->current_temperature - setPointCorrection > hysterisisUnderOff ||
-                    this->same_float(setPointCorrection, this->pidController->getOutputMin())) {
-                ESP_LOGI(TAG, "Turn off heating!");
+            if (this->current_temperature - deviceState.targetTemperature > hysterisisUnderOff) {
+                ESP_LOGI(TAG, "Turn off while heating: delta={%f} current={%f} targetTemperature={%f}", delta, this->current_temperature, deviceState.targetTemperature);
                 this->dsm->internalTurnOff();
                 return;
             }
-
-            //this->dsm->setTemperature(setPointCorrection);
-            //this->dsm->commit();
             break;
         }
         case climate::CLIMATE_ACTION_COOLING: {
@@ -902,15 +857,11 @@ void MitsubishiHeatPump::run_workflows() {
                 return;
             }
 
-            if (setPointCorrection - this->current_temperature > hysterisisUnderOff ||
-                    this->same_float(this->pidController->getOutputMax(), setPointCorrection)) {
-                ESP_LOGI(TAG, "Turn off cooling!");
+            if (deviceState.targetTemperature - this->current_temperature > hysterisisUnderOff) {
+                ESP_LOGI(TAG, "Turn off while cooling: delta={%f} current={%f} targetTemperature={%f}", delta, this->current_temperature, deviceState.targetTemperature);
                 this->dsm->internalTurnOff();
                 return;
             }
-
-            //this->dsm->setTemperature(setPointCorrection);
-            //this->dsm->commit();
             break;
         }
         case climate::CLIMATE_ACTION_IDLE: {
@@ -919,23 +870,20 @@ void MitsubishiHeatPump::run_workflows() {
             }
 
             if (this->mode == climate::CLIMATE_MODE_HEAT) {
-                if (this->current_temperature - setPointCorrection > hysterisisUnderOff ||
-                        this->same_float(setPointCorrection, this->pidController->getOutputMin())) {
-                    ESP_LOGI(TAG, "Turn off while idling heat!");
+                const float delta = this->current_temperature - deviceState.targetTemperature;
+                if (delta > hysterisisUnderOff) {
+                    ESP_LOGI(TAG, "Turn off while idling heat: delta={%f} current={%f} targetTemperature={%f}", delta, this->current_temperature, deviceState.targetTemperature);
                     this->dsm->internalTurnOff();
                     return;
                 }
             } else if (this->mode == climate::CLIMATE_MODE_COOL) {
-                if (setPointCorrection - this->current_temperature > hysterisisUnderOff ||
-                        this->same_float(this->pidController->getOutputMax(), setPointCorrection)) {
-                    ESP_LOGI(TAG, "Turn off while idling cool!");
+                const float delta = deviceState.targetTemperature - this->current_temperature;
+                if (delta > hysterisisUnderOff) {
+                    ESP_LOGI(TAG, "Turn off while idling cool: delta={%f} current={%f} targetTemperature={%f}", delta, this->current_temperature, deviceState.targetTemperature);
                     this->dsm->internalTurnOff();
                     return;
                 }
             }
-
-            //this->dsm->setTemperature(setPointCorrection);
-            //this->dsm->commit();
             break;
         }
         default: {
@@ -944,25 +892,23 @@ void MitsubishiHeatPump::run_workflows() {
             }
 
             if (this->mode == climate::CLIMATE_MODE_HEAT) {
-                const float delta = this->current_temperature - setPointCorrection;
-                ESP_LOGD(TAG, "Device off on heat: delta={%f} current={%f} setPointCorrection={%f}", delta, this->current_temperature, setPointCorrection);
+                const float delta = this->current_temperature - deviceState.targetTemperature;
                 if (delta > 0) {
                     return;
                 }
 
-                ESP_LOGI(TAG, "Turning on Workflow heat");
+                ESP_LOGI(TAG, "Turning on Workflow heat: delta={%f} current={%f} targetTemperature={%f}", delta, this->current_temperature, deviceState.targetTemperature);
                 this->dsm->internalTurnOn();
             } else if (this->mode == climate::CLIMATE_MODE_COOL) {
-                const float delta = setPointCorrection - this->current_temperature;
-                ESP_LOGD(TAG, "Device off on cool: delta={%f} current={%f} setPointCorrection={%f}", delta, this->current_temperature, setPointCorrection);
+                const float delta = deviceState.targetTemperature - this->current_temperature;
                 if (delta > 0) {
                     return;
                 }
 
-                ESP_LOGI(TAG, "Turning on Workflow cool");
+                ESP_LOGI(TAG, "Turning on Workflow cool: delta={%f} current={%f} targetTemperature={%f}", delta, this->current_temperature, deviceState.targetTemperature);
                 this->dsm->internalTurnOn();
             } else {
-                ESP_LOGI(TAG, "Device off on other: current={%f} setPointCorrection={%f}", this->current_temperature, setPointCorrection);
+                ESP_LOGI(TAG, "Device off on other: current={%f} targetTemperature={%f}", this->current_temperature, deviceState.targetTemperature);
             }
             break;
         }

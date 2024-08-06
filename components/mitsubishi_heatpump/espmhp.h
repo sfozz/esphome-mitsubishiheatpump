@@ -22,7 +22,6 @@
 #include "esphome/core/preferences.h"
 #include <chrono>
 
-#include "pidcontroller.h"
 #include "devicestate.h"
 
 #include "HeatPump.h"
@@ -74,7 +73,6 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         esphome::binary_sensor::BinarySensor* device_status_operating;
         esphome::sensor::Sensor* device_status_compressor_frequency;
         esphome::sensor::Sensor* device_status_last_updated;
-        esphome::sensor::Sensor* pid_set_point_correction;
         esphome::sensor::Sensor* device_set_point;
 
         // Print a banner with library information.
@@ -202,8 +200,6 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
 
         bool same_float(const float left, const float right);
 
-        PIDController *pidController;
-        void ensure_pid_target();
         void update_setpoint(float value);
 
         void run_workflows();

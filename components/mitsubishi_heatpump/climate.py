@@ -30,7 +30,6 @@ CONF_DEVICE_STATE_LAST_UPDATED = "device_state_last_updated"
 CONF_DEVICE_STATUS_OPERATING = "device_status_operating"
 CONF_DEVICE_STATUS_COMPRESSOR_FREQUENCY = "device_status_compressor_frequency"
 CONF_DEVICE_STATUS_LAST_UPDATED = "device_status_last_updated"
-CONF_PID_SET_POINT_CORRECTION = "pid_set_point_correction"
 CONF_DEVICE_SET_POINT = "device_set_point"
 
 CONF_HORIZONTAL_SWING_SELECT = "horizontal_vane_select"
@@ -105,10 +104,6 @@ DEVICE_STATUS_LAST_UPDATED_SCHEMA = sensor.sensor_schema(sensor.Sensor,
     entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
 )
 
-PID_SET_POINT_CORRECTION_SCHEMA = sensor.sensor_schema(sensor.Sensor,
-    entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
-)
-
 DEVICE_SET_POINT_SCHEMA = sensor.sensor_schema(sensor.Sensor,
     entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
 )
@@ -148,11 +143,6 @@ DEVICE_STATUS_LAST_UPDATED_DEFAULT = DEVICE_STATUS_LAST_UPDATED_SCHEMA({
     CONF_NAME: "Device status last updated"
 })
 
-PID_SET_POINT_CORRECTION_DEFAULT = PID_SET_POINT_CORRECTION_SCHEMA({
-    CONF_ID: "pid_set_point_correction",
-    CONF_NAME: "PID Set Point Correction"
-})
-
 DEVICE_SET_POINT_DEFAULT = DEVICE_SET_POINT_SCHEMA({
     CONF_ID: "device_set_point",
     CONF_NAME: "Device Set Point"
@@ -165,7 +155,6 @@ DEVICE_STATE_LAST_UPDATED_DEFAULT[CONF_INTERNAL] = False
 DEVICE_STATUS_OPERATING_DEFAULT[CONF_INTERNAL] = False
 DEVICE_STATUS_COMPRESSOR_FREQUENCY_DEFAULT[CONF_INTERNAL] = False
 DEVICE_STATUS_LAST_UPDATED_DEFAULT[CONF_INTERNAL] = False
-PID_SET_POINT_CORRECTION_DEFAULT[CONF_INTERNAL] = False
 DEVICE_SET_POINT_DEFAULT[CONF_INTERNAL] = False
 
 CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
@@ -193,7 +182,6 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
         cv.Optional(CONF_DEVICE_STATUS_OPERATING, default=DEVICE_STATUS_OPERATING_DEFAULT): DEVICE_STATUS_OPERATING_SCHEMA,
         cv.Optional(CONF_DEVICE_STATUS_COMPRESSOR_FREQUENCY, default=DEVICE_STATUS_COMPRESSOR_FREQUENCY_DEFAULT): DEVICE_STATUS_COMPRESSOR_FREQUENCY_SCHEMA,
         cv.Optional(CONF_DEVICE_STATUS_LAST_UPDATED, default=DEVICE_STATUS_LAST_UPDATED_DEFAULT): DEVICE_STATUS_LAST_UPDATED_SCHEMA,
-        cv.Optional(CONF_PID_SET_POINT_CORRECTION, default=PID_SET_POINT_CORRECTION_DEFAULT): PID_SET_POINT_CORRECTION_SCHEMA,
         cv.Optional(CONF_DEVICE_SET_POINT, default=DEVICE_SET_POINT_DEFAULT): DEVICE_SET_POINT_SCHEMA,
 
         # Optionally override the supported ClimateTraits.
@@ -272,7 +260,6 @@ def to_code(config):
     yield binary_sensor.register_binary_sensor(var.device_status_operating, config[CONF_DEVICE_STATUS_OPERATING])
     yield sensor.register_sensor(var.device_status_compressor_frequency, config[CONF_DEVICE_STATUS_COMPRESSOR_FREQUENCY])
     yield sensor.register_sensor(var.device_status_last_updated, config[CONF_DEVICE_STATUS_LAST_UPDATED])
-    yield sensor.register_sensor(var.pid_set_point_correction, config[CONF_PID_SET_POINT_CORRECTION])
     yield sensor.register_sensor(var.device_set_point, config[CONF_DEVICE_SET_POINT])
 
     cg.add_library(
