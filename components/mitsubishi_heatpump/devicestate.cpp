@@ -298,9 +298,10 @@ namespace devicestate {
      */
     void DeviceStateManager::hpStatusChanged(heatpumpStatus currentStatus) {
         if (!this->statusInitialized) {
+            this->statusInitialized = true;
             ESP_LOGW(TAG, "HeatPump status initialized.");
         }
-        this->statusInitialized = true;
+
         this->deviceStatus = devicestate::toDeviceStatus(&currentStatus);
 
         this->device_status_operating->publish_state(this->deviceStatus.operating);
