@@ -511,16 +511,9 @@ void MitsubishiHeatPump::updateDevice() {
                 this->action = climate::CLIMATE_ACTION_FAN;
                 break;
             case DeviceMode::DeviceMode_Auto:
-                this->mode = climate::CLIMATE_MODE_HEAT_COOL;
                 if (auto_setpoint != deviceState.targetTemperature) {
                     auto_setpoint = deviceState.targetTemperature;
                     save(deviceState.targetTemperature, auto_storage);
-                }
-
-                if (this->dsm->isInternalPowerOn()) {
-                    this->action = climate::CLIMATE_ACTION_IDLE;
-                } else {
-                    this->action = climate::CLIMATE_ACTION_OFF;
                 }
 
                 if (deviceStatus.operating) {
@@ -529,7 +522,14 @@ void MitsubishiHeatPump::updateDevice() {
                     } else if (this->current_temperature < this->target_temperature) {
                         this->action = climate::CLIMATE_ACTION_HEATING;
                     }
+                } else {
+                    if (this->dsm->isInternalPowerOn()) {
+                        this->action = climate::CLIMATE_ACTION_IDLE;
+                    } else {
+                        this->action = climate::CLIMATE_ACTION_OFF;
+                    }
                 }
+
                 break;
             default:
                 ESP_LOGW(
