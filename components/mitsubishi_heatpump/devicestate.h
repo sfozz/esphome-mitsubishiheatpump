@@ -31,6 +31,7 @@ namespace devicestate {
     FanMode_High
   };
   FanMode toFanMode(heatpumpSettings *currentSettings);
+  const char* fanModeToString(FanMode mode);
 
   enum SwingMode {
     SwingMode_Both,
@@ -98,6 +99,9 @@ namespace devicestate {
       esphome::sensor::Sensor* device_status_compressor_frequency;
       esphome::sensor::Sensor* device_status_last_updated;
 
+      // HeatPump object using the underlying Arduino library.
+      HeatPump* hp;
+
       uint32_t lastInternalPowerUpdate = esphome::millis();
       bool internalPowerOn;
 
@@ -125,13 +129,12 @@ namespace devicestate {
         esphome::sensor::Sensor* device_status_last_updated
       );
 
-      // HeatPump object using the underlying Arduino library.
-      HeatPump* hp;
-
       DeviceStatus getDeviceStatus();
       DeviceState getDeviceState();
 
       bool isInitialized();
+      bool initialize(HardwareSerial *hw_serial, int baud, int rx_pin, int tx_pin);
+
       void update();
       bool isInternalPowerOn();
 
@@ -145,6 +148,8 @@ namespace devicestate {
       bool setVerticalSwingMode(VerticalSwingMode mode, bool commit);
       bool setHorizontalSwingMode(HorizontalSwingMode mode);
       bool setHorizontalSwingMode(HorizontalSwingMode mode, bool commit);
+      bool setFanMode(FanMode mode);
+      bool setFanMode(FanMode mode, bool commit);
 
       bool commit();
 
@@ -154,6 +159,7 @@ namespace devicestate {
       bool internalTurnOn();
       bool internalTurnOff();
 
+      void setRemoteTemperature(float current);
       void setTemperature(float target);
 
       void dump_state();

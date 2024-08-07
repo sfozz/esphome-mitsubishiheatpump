@@ -95,15 +95,7 @@ void MitsubishiHeatPump::update() {
     // This will be called every "update_interval" milliseconds.
     this->dsm->update();
     if (!this->dsm->isInitialized()) {
-        /*
-         * We should always get a valid pointer here once the HeatPump
-         * component fully initializes. If HeatPump hasn't read the settings
-         * from the unit yet (dsm->hp->connect() doesn't do this, sadly), we'll need
-         * to punt on the update. Likely not an issue when run in callback
-         * mode, but that isn't working right yet.
-         */
         ESP_LOGW(TAG, "Waiting for HeatPump to read the settings the first time.");
-        esphome::delay(10);
         return;
     }
 
@@ -356,40 +348,40 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
         ESP_LOGV("control", "Requested fan mode is %s",
                  climate::climate_fan_mode_to_string(*call.get_fan_mode()));
         this->fan_mode = *call.get_fan_mode();
+
         switch(*call.get_fan_mode()) {
             case climate::CLIMATE_FAN_OFF:
-                dsm->hp->setPowerSetting("OFF");
+                this->dsm->turnOff();
                 updated = true;
                 break;
             case climate::CLIMATE_FAN_DIFFUSE:
-                dsm->hp->setFanSpeed("QUIET");
+                this->dsm->setFanMode(devicestate::FanMode::FanMode_Quiet, false);
                 updated = true;
                 break;
             case climate::CLIMATE_FAN_LOW:
-                dsm->hp->setFanSpeed("1");
+                this->dsm->setFanMode(devicestate::FanMode::FanMode_Low, false);
                 updated = true;
                 break;
             case climate::CLIMATE_FAN_MEDIUM:
-                dsm->hp->setFanSpeed("2");
+                this->dsm->setFanMode(devicestate::FanMode::FanMode_Medium, false);
                 updated = true;
                 break;
             case climate::CLIMATE_FAN_MIDDLE:
-                dsm->hp->setFanSpeed("3");
+                this->dsm->setFanMode(devicestate::FanMode::FanMode_Middle, false);
                 updated = true;
                 break;
             case climate::CLIMATE_FAN_HIGH:
-                dsm->hp->setFanSpeed("4");
+                this->dsm->setFanMode(devicestate::FanMode::FanMode_High, false);
                 updated = true;
                 break;
             case climate::CLIMATE_FAN_ON:
             case climate::CLIMATE_FAN_AUTO:
             default:
-                dsm->hp->setFanSpeed("AUTO");
+                this->dsm->setFanMode(devicestate::FanMode::FanMode_Auto, false);
                 updated = true;
                 break;
         }
     }
-
 
     ESP_LOGV(TAG, "in the swing mode stage");
     //const char* VANE_MAP[7]        = {"AUTO", "1", "2", "3", "4", "5", "SWING"};
@@ -400,23 +392,23 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
         this->swing_mode = *call.get_swing_mode();
         switch(*call.get_swing_mode()) {
             case climate::CLIMATE_SWING_OFF:
-                dsm->hp->setVaneSetting("AUTO");
-                dsm->hp->setWideVaneSetting("|");
+                this->dsm->setVerticalSwingMode(devicestate::VerticalSwingMode::VerticalSwingMode_Auto, false);
+                this->dsm->setHorizontalSwingMode(devicestate::HorizontalSwingMode::HorizontalSwingMode_Center, false);
                 updated = true;
                 break;
             case climate::CLIMATE_SWING_VERTICAL:
-                dsm->hp->setVaneSetting("SWING");
-                dsm->hp->setWideVaneSetting("|");
+                this->dsm->setVerticalSwingMode(devicestate::VerticalSwingMode::VerticalSwingMode_Swing, false);
+                this->dsm->setHorizontalSwingMode(devicestate::HorizontalSwingMode::HorizontalSwingMode_Center, false);
                 updated = true;
                 break;
             case climate::CLIMATE_SWING_HORIZONTAL:
-                dsm->hp->setVaneSetting("3");
-                dsm->hp->setWideVaneSetting("SWING");
+                this->dsm->setVerticalSwingMode(devicestate::VerticalSwingMode::VerticalSwingMode_Center, false);
+                this->dsm->setHorizontalSwingMode(devicestate::HorizontalSwingMode::HorizontalSwingMode_Swing, false);
                 updated = true;
                 break;
             case climate::CLIMATE_SWING_BOTH:
-                dsm->hp->setVaneSetting("SWING");
-                dsm->hp->setWideVaneSetting("SWING");
+                this->dsm->setVerticalSwingMode(devicestate::VerticalSwingMode::VerticalSwingMode_Swing, false);
+                this->dsm->setHorizontalSwingMode(devicestate::HorizontalSwingMode::HorizontalSwingMode_Swing, false);
                 updated = true;
                 break;
             default:
@@ -428,8 +420,13 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
 
     // send the update back to esphome:
     this->publish_state();
-    // and the heat pump:
-    this->dsm->commit();
+
+    if (updated) {
+        // and the heat pump:
+        if (!this->dsm->commit()) {
+            ESP_LOGW(TAG, "Failed to update device state");
+        }
+    }
 }
 
 void MitsubishiHeatPump::updateDevice() {
@@ -635,7 +632,7 @@ void MitsubishiHeatPump::updateDevice() {
 }
 
 void MitsubishiHeatPump::set_remote_temperature(float temp) {
-    ESP_LOGD(TAG, "Setting remote temp: %.1f", temp);
+    ESP_LOGI(TAG, "Setting remote temp: %.2f", temp);
     if (temp > 0) {
         last_remote_temperature_sensor_update_ = 
             std::chrono::steady_clock::now();
@@ -643,7 +640,7 @@ void MitsubishiHeatPump::set_remote_temperature(float temp) {
         last_remote_temperature_sensor_update_.reset();
     }
 
-    this->dsm->hp->setRemoteTemperature(temp);
+    this->dsm->setRemoteTemperature(temp);
 }
 
 void MitsubishiHeatPump::ping() {
@@ -724,11 +721,8 @@ void MitsubishiHeatPump::setup() {
             YESNO((void *)this->get_hw_serial_() == (void *)&Serial)
     );
 
-    ESP_LOGCONFIG(TAG, "Calling dsm->hp->connect(%p)", this->get_hw_serial_());
-    if (dsm->hp->connect(this->get_hw_serial_(), this->baud_, this->rx_pin_, this->tx_pin_)) {
-        dsm->hp->sync();
-    }
-    else {
+    ESP_LOGCONFIG(TAG, "Calling dsm->initialize(%p, %d, %d, %d)", hw_serial, this->baud_, this->rx_pin_, this->tx_pin_);
+    if (!this->dsm->initialize(this->get_hw_serial_(), this->baud_, this->rx_pin_, this->tx_pin_)) {
         ESP_LOGCONFIG(
                 TAG,
                 "Connection to HeatPump failed."
@@ -832,8 +826,7 @@ void MitsubishiHeatPump::run_workflows() {
         return;
     }
 
-    heatpumpSettings currentSettings = this->dsm->hp->getSettings();
-    const DeviceState deviceState = devicestate::toDeviceState(&currentSettings);
+    const DeviceState deviceState = this->dsm->getDeviceState();
     device_state_active->publish_state(deviceState.active);
     ESP_LOGD(TAG, "Device active on workflow: deviceState.active={%s} internalPowerOn={%s}", YESNO(deviceState.active), YESNO(this->dsm->isInternalPowerOn()));
     if (deviceState.active != this->dsm->isInternalPowerOn()) {

@@ -144,6 +144,26 @@ namespace devicestate {
         }
     }
 
+    const char* fanModeToString(FanMode mode) {
+        switch(mode) {
+            case FanMode::FanMode_Auto:
+                return "AUTO";
+            case FanMode::FanMode_Quiet:
+                return "QUIET";
+            case FanMode::FanMode_Low:
+                return "1";
+            case FanMode::FanMode_Medium:
+                return "2";
+            case FanMode::FanMode_Middle:
+                return "3";
+            case FanMode::FanMode_High:
+                return "4";
+            default:
+                ESP_LOGW(TAG, "Invalid fan mode %d", mode);
+                return "UNKNOWN";
+        }
+    }
+
     DeviceMode toDeviceMode(heatpumpSettings *currentSettings) {
         if (strcmp(currentSettings->mode, "HEAT") == 0) {
             return DeviceMode::DeviceMode_Heat;
@@ -328,6 +348,14 @@ namespace devicestate {
         return this->settingsInitialized && this->statusInitialized;
     }
 
+    bool DeviceStateManager::initialize(HardwareSerial *hw_serial, int baud, int rx_pin, int tx_pin) {
+        if (this->hp->connect(hw_serial, baud, rx_pin, tx_pin)) {
+            this->hp->sync();
+            return true;
+        }
+        return false;
+    }
+
     DeviceStatus DeviceStateManager::getDeviceStatus() {
         return this->deviceStatus;
     }
@@ -337,7 +365,6 @@ namespace devicestate {
     }
 
     void DeviceStateManager::update() {
-        // This will be called every "update_interval" milliseconds.
         //this->dump_config();
         this->hp->sync();
         
@@ -446,6 +473,37 @@ namespace devicestate {
         }
     }
 
+    bool DeviceStateManager::setFanMode(FanMode mode) {
+        return this->setFanMode(mode, true);
+    }
+
+    bool DeviceStateManager::setFanMode(FanMode mode, bool commit) {
+        const char* newMode = fanModeToString(mode);
+        if (mode == this->deviceState.fanMode) {
+            const char* oldMode = fanModeToString(this->deviceState.fanMode);
+            ESP_LOGW(TAG, "Did not update fan mode due to value: %s (%s)", newMode, oldMode);
+            return false;
+        }
+
+        if (strcmp(newMode,"UNKNOWN") == 0) {
+            ESP_LOGW(TAG, "Did not update fan mode due to invalid value: %s", newMode);
+            return false;
+        }
+
+        this->hp->setFanSpeed(newMode);
+        if (!commit) {
+            return true;
+        }
+
+        if (this->commit()) {
+            ESP_LOGW(TAG, "Performed set fan mode!");
+            return true;
+        } else {
+            ESP_LOGW(TAG, "Failed to perform set fan mode!");
+            return false;
+        }
+    }
+
     bool DeviceStateManager::setVerticalSwingMode(VerticalSwingMode mode) {
         return this->setVerticalSwingMode(mode, true);
     }
@@ -510,7 +568,10 @@ namespace devicestate {
 
     void DeviceStateManager::setTemperature(float value) {
         this->hp->setTemperature(value);
-        //this->device_set_point->publish_state(value);
+    }
+
+    void DeviceStateManager::setRemoteTemperature(float current) {
+        this->hp->setRemoteTemperature(current);
     }
 
     bool DeviceStateManager::commit() {
@@ -529,7 +590,7 @@ namespace devicestate {
 
     void DeviceStateManager::dump_state() {
         ESP_LOGI(TAG, "Internal State");
-        ESP_LOGI(TAG, "  active: %s", TRUEFALSE(this->isInternalPowerOn()));
+        ESP_LOGI(TAG, "  powerOn: %s", TRUEFALSE(this->isInternalPowerOn()));
         /*
         struct DeviceState {
             bool active;
@@ -542,6 +603,13 @@ namespace devicestate {
         ESP_LOGI(TAG, "  mode: %s", devicestate::deviceModeToString(this->deviceState.mode));
         ESP_LOGI(TAG, "  targetTemperature: %f", this->deviceState.targetTemperature);
 
+        /*
+        struct DeviceStatus {
+            bool operating;
+            float currentTemperature;
+            int compressorFrequency;
+        };
+        */
         ESP_LOGI(TAG, "Heatpump Status");
         ESP_LOGI(TAG, "  roomTemperature: %f", this->deviceStatus.currentTemperature);
         ESP_LOGI(TAG, "  operating: %s", TRUEFALSE(this->deviceStatus.operating));
