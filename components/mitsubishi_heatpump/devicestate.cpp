@@ -230,6 +230,7 @@ namespace devicestate {
     }
 
     DeviceStateManager::DeviceStateManager(
+      ConnectionMetadata connectionMetadata,
       esphome::binary_sensor::BinarySensor* internal_power_on,
       esphome::binary_sensor::BinarySensor* device_state_connected,
       esphome::binary_sensor::BinarySensor* device_state_active,
@@ -239,6 +240,9 @@ namespace devicestate {
       esphome::sensor::Sensor* device_status_compressor_frequency,
       esphome::sensor::Sensor* device_status_last_updated
     ) {
+        this->connectionMetadata = connectionMetadata;
+        this->disconnected = 0;
+
         this->internal_power_on = internal_power_on;
         this->device_state_connected = device_state_connected;
         this->device_state_active = device_state_active;
@@ -305,7 +309,8 @@ namespace devicestate {
         }
         this->deviceState = deviceState;
 
-        this->device_state_connected->publish_state(this->deviceState.connected);
+        //this->device_state_connected->publish_state(this->deviceState.connected);
+        this->device_state_connected->publish_state(this->hp->isConnected());
         this->device_state_active->publish_state(this->deviceState.active);
         this->device_set_point->publish_state(this->deviceState.targetTemperature);
 
@@ -348,12 +353,22 @@ namespace devicestate {
         return this->settingsInitialized && this->statusInitialized;
     }
 
-    bool DeviceStateManager::initialize(HardwareSerial *hw_serial, int baud, int rx_pin, int tx_pin) {
-        if (this->hp->connect(hw_serial, baud, rx_pin, tx_pin)) {
+    bool DeviceStateManager::connect() {
+        if (this->hp->connect(
+                this->connectionMetadata.hardwareSerial,
+                this->connectionMetadata.baud,
+                this->connectionMetadata.rxPin,
+                this->connectionMetadata.txPin)) {
+            ESP_LOGW(TAG, "Connect succeeded");
             this->hp->sync();
             return true;
         }
+        ESP_LOGW(TAG, "Connect failed");
         return false;
+    }
+
+    bool DeviceStateManager::initialize() {
+        return this->connect();
     }
 
     DeviceStatus DeviceStateManager::getDeviceStatus() {
@@ -367,12 +382,25 @@ namespace devicestate {
     void DeviceStateManager::update() {
         //this->dump_config();
         this->hp->sync();
-        
     #ifndef USE_CALLBACKS
         this->hpSettingsChanged();
         heatpumpStatus currentStatus = hp->getStatus();
         this->hpStatusChanged(currentStatus);
     #endif
+
+        if (this->isInitialized()) {
+            DeviceState deviceState = this->getDeviceState();
+            if (!deviceState.connected) {
+                this->disconnected += 1;
+                ESP_LOGW(TAG, "Device not connected: %d", this->disconnected);
+                if (disconnected >= 500) {
+                    this->connect();
+                    this->disconnected = 0;
+                }
+            } else {
+                this->disconnected = 0;
+            }
+        }
     }
 
     bool DeviceStateManager::isInternalPowerOn() {

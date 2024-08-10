@@ -701,8 +701,15 @@ void MitsubishiHeatPump::setup() {
         return;
     }
 
+    devicestate::ConnectionMetadata connectionMetadata;
+    connectionMetadata.hardwareSerial = this->get_hw_serial_();
+    connectionMetadata.baud = this->baud_;
+    connectionMetadata.rxPin = this->rx_pin_;
+    connectionMetadata.txPin = this->tx_pin_;
+
     ESP_LOGCONFIG(TAG, "Initializing new HeatPump object.");
     this->dsm = new devicestate::DeviceStateManager(
+        connectionMetadata,
         this->internal_power_on,
         this->device_state_connected,
         this->device_state_active,
@@ -721,8 +728,8 @@ void MitsubishiHeatPump::setup() {
             YESNO((void *)this->get_hw_serial_() == (void *)&Serial)
     );
 
-    ESP_LOGCONFIG(TAG, "Calling dsm->initialize(%p, %d, %d, %d)", hw_serial, this->baud_, this->rx_pin_, this->tx_pin_);
-    if (!this->dsm->initialize(this->get_hw_serial_(), this->baud_, this->rx_pin_, this->tx_pin_)) {
+    ESP_LOGCONFIG(TAG, "Calling dsm->initialize()");
+    if (!this->dsm->initialize()) {
         ESP_LOGCONFIG(
                 TAG,
                 "Connection to HeatPump failed."

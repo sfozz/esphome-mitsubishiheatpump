@@ -88,8 +88,18 @@ namespace devicestate {
   bool deviceStateEqual(DeviceState left, DeviceState right);
   DeviceState toDeviceState(heatpumpSettings *currentSettings);
 
+  struct ConnectionMetadata {
+    HardwareSerial *hardwareSerial;
+    int baud;
+    int rxPin;
+    int txPin;
+  };
+
   class DeviceStateManager {
     private:
+      ConnectionMetadata connectionMetadata;
+      int disconnected;
+
       esphome::binary_sensor::BinarySensor* internal_power_on;
       esphome::binary_sensor::BinarySensor* device_state_connected;
       esphome::binary_sensor::BinarySensor* device_state_active;
@@ -113,12 +123,15 @@ namespace devicestate {
       DeviceStatus deviceStatus;
       int deviceStatusLastUpdated;
 
+      bool connect();
+
       void hpSettingsChanged();
       void hpStatusChanged(heatpumpStatus currentStatus);
       static void log_packet(byte* packet, unsigned int length, char* packetDirection);
 
     public:
       DeviceStateManager(
+        ConnectionMetadata connectionMetadata,
         esphome::binary_sensor::BinarySensor* internal_power_on,
         esphome::binary_sensor::BinarySensor* device_state_connected,
         esphome::binary_sensor::BinarySensor* device_state_active,
@@ -133,7 +146,7 @@ namespace devicestate {
       DeviceState getDeviceState();
 
       bool isInitialized();
-      bool initialize(HardwareSerial *hw_serial, int baud, int rx_pin, int tx_pin);
+      bool initialize();
 
       void update();
       bool isInternalPowerOn();
