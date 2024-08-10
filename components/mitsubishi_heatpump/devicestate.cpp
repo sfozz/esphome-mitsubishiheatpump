@@ -23,8 +23,7 @@ namespace devicestate {
         left.swingMode == right.swingMode &&
         left.verticalSwingMode == right.verticalSwingMode &&
         left.horizontalSwingMode == right.horizontalSwingMode &&
-        same_float(left.targetTemperature, right.targetTemperature, 0.1) &&
-        left.connected == right.connected;
+        same_float(left.targetTemperature, right.targetTemperature, 0.1);
     }
 
     bool isDeviceActive(heatpumpSettings *currentSettings) {
@@ -225,7 +224,6 @@ namespace devicestate {
         deviceState.verticalSwingMode = toVerticalSwingMode(currentSettings);
         deviceState.horizontalSwingMode = toHorizontalSwingMode(currentSettings);
         deviceState.targetTemperature = currentSettings->temperature;
-        deviceState.connected = currentSettings->connected;
         return deviceState;
     }
 
@@ -393,7 +391,7 @@ namespace devicestate {
             if (!this->hp->isConnected()) {
                 this->disconnected += 1;
                 ESP_LOGW(TAG, "Device not connected: %d", this->disconnected);
-                if (disconnected >= 500) {
+                if (this->disconnected >= 500) {
                     this->connect();
                     this->disconnected = 0;
                 }
@@ -619,6 +617,7 @@ namespace devicestate {
     void DeviceStateManager::dump_state() {
         ESP_LOGI(TAG, "Internal State");
         ESP_LOGI(TAG, "  powerOn: %s", TRUEFALSE(this->isInternalPowerOn()));
+        ESP_LOGI(TAG, "  connected: %s", TRUEFALSE(this->hp->isConnected()));
         /*
         struct DeviceState {
             bool active;
@@ -630,6 +629,7 @@ namespace devicestate {
         ESP_LOGI(TAG, "  active: %s", TRUEFALSE(this->deviceState.active));
         ESP_LOGI(TAG, "  mode: %s", devicestate::deviceModeToString(this->deviceState.mode));
         ESP_LOGI(TAG, "  targetTemperature: %f", this->deviceState.targetTemperature);
+        
 
         /*
         struct DeviceStatus {

@@ -83,7 +83,7 @@ namespace devicestate {
     VerticalSwingMode verticalSwingMode;
     HorizontalSwingMode horizontalSwingMode;
     float targetTemperature;
-    bool connected;
+    //bool connected;
   };
   bool deviceStateEqual(DeviceState left, DeviceState right);
   DeviceState toDeviceState(heatpumpSettings *currentSettings);
