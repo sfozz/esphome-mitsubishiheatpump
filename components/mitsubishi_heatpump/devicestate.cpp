@@ -390,7 +390,7 @@ namespace devicestate {
 
         if (this->isInitialized()) {
             DeviceState deviceState = this->getDeviceState();
-            if (!deviceState.connected) {
+            if (!this->hp->isConnected()) {
                 this->disconnected += 1;
                 ESP_LOGW(TAG, "Device not connected: %d", this->disconnected);
                 if (disconnected >= 500) {
