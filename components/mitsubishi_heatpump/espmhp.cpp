@@ -896,7 +896,7 @@ void MitsubishiHeatPump::run_workflows() {
 
             if (this->mode == climate::CLIMATE_MODE_HEAT) {
                 const float delta = this->current_temperature - deviceState.targetTemperature;
-                if (delta > 0.01) {
+                if (delta > hysterisisOverOn) {
                     return;
                 }
 
@@ -904,7 +904,7 @@ void MitsubishiHeatPump::run_workflows() {
                 this->dsm->internalTurnOn();
             } else if (this->mode == climate::CLIMATE_MODE_COOL) {
                 const float delta = deviceState.targetTemperature - this->current_temperature;
-                if (delta > 0.01) {
+                if (delta > hysterisisOverOn) {
                     return;
                 }
 
