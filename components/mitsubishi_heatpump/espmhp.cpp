@@ -797,7 +797,8 @@ void MitsubishiHeatPump::dump_config() {
     ESP_LOGI(TAG, "  Supports AWAY mode: %s", YESNO(false));
     ESP_LOGI(TAG, "  Min temp: %.1f", this->min_temp);
     ESP_LOGI(TAG, "  Max temp: %.1f", this->max_temp);
-    ESP_LOGI(TAG, "  Hysteresis: %.1f", hysterisisUnderOff);
+    ESP_LOGI(TAG, "  Hysteresis Under: %.3f", hysterisisUnderOff);
+    ESP_LOGI(TAG, "  Hysteresis Over: %.3f", hysterisisOverOn);
     ESP_LOGI(TAG, "  Saved heat: %.1f", heat_setpoint.value_or(-1));
     ESP_LOGI(TAG, "  Saved cool: %.1f", cool_setpoint.value_or(-1));
     ESP_LOGI(TAG, "  Saved auto: %.1f", auto_setpoint.value_or(-1));
