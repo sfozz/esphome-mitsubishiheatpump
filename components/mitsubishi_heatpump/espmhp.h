@@ -46,7 +46,7 @@ static const float   ESPMHP_TARGET_TEMPERATURE_STEP = 0.5; // temperature settin
 static const float   ESPMHP_CURRENT_TEMPERATURE_STEP = 0.1; // temperature setting step,
                                                     // in degrees C
 
-static const float hysterisisUnderOff = 0.5; // in degrees C
+static const float hysterisisUnderOff = 0.25; // in degrees C
 
 class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::climate::Climate {
     public:
