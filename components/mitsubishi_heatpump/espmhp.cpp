@@ -896,7 +896,7 @@ void MitsubishiHeatPump::run_workflows() {
             }
 
             if (this->mode == climate::CLIMATE_MODE_HEAT) {
-                const float delta = this->current_temperature - deviceState.targetTemperature;
+                const float delta = deviceState.targetTemperature - this->current_temperature;
                 if (delta > hysterisisOverOn) {
                     return;
                 }
@@ -904,7 +904,7 @@ void MitsubishiHeatPump::run_workflows() {
                 ESP_LOGI(TAG, "Turning on Workflow heat: delta={%f} current={%f} targetTemperature={%f}", delta, this->current_temperature, deviceState.targetTemperature);
                 this->dsm->internalTurnOn();
             } else if (this->mode == climate::CLIMATE_MODE_COOL) {
-                const float delta = deviceState.targetTemperature - this->current_temperature;
+                const float delta = this->current_temperature - deviceState.targetTemperature;
                 if (delta > hysterisisOverOn) {
                     return;
                 }
