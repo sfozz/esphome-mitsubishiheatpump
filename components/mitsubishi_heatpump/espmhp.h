@@ -69,6 +69,7 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         esphome::binary_sensor::BinarySensor* device_state_active;
         esphome::sensor::Sensor* device_state_last_updated;
         esphome::binary_sensor::BinarySensor* device_status_operating;
+        esphome::sensor::Sensor* device_status_current_temperature;
         esphome::sensor::Sensor* device_status_compressor_frequency;
         esphome::sensor::Sensor* device_status_last_updated;
         esphome::sensor::Sensor* device_set_point;
@@ -180,6 +181,10 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         void on_vertical_swing_change(const std::string &swing);
 
     private:
+        /// The current temperature of the climate device, as reported from the integration.
+        float remote_temperature{NAN};
+        bool remote_temperature_updated{false};
+
         void enforce_remote_temperature_sensor_timeout();
 
         // Retrieve the HardwareSerial pointer from friend and subclasses.
@@ -195,8 +200,6 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         std::optional<std::chrono::duration<long long, std::ratio<60>>> remote_ping_timeout_;
         std::optional<std::chrono::time_point<std::chrono::steady_clock>> last_remote_temperature_sensor_update_;
         std::optional<std::chrono::time_point<std::chrono::steady_clock>> last_ping_request_;
-
-        bool same_float(const float left, const float right);
 
         void update_setpoint(float value);
 

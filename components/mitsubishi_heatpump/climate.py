@@ -28,6 +28,7 @@ CONF_DEVICE_STATE_CONNECTED = "device_state_connected"
 CONF_DEVICE_STATE_ACTIVE = "device_state_active"
 CONF_DEVICE_STATE_LAST_UPDATED = "device_state_last_updated"
 CONF_DEVICE_STATUS_OPERATING = "device_status_operating"
+CONF_DEVICE_STATUS_CURRENT_TEMPERATURE = "device_status_current_temperature"
 CONF_DEVICE_STATUS_COMPRESSOR_FREQUENCY = "device_status_compressor_frequency"
 CONF_DEVICE_STATUS_LAST_UPDATED = "device_status_last_updated"
 CONF_DEVICE_SET_POINT = "device_set_point"
@@ -96,6 +97,10 @@ DEVICE_STATUS_OPERATING_SCHEMA = binary_sensor.binary_sensor_schema(binary_senso
     entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
 )
 
+DEVICE_STATUS_CURRENT_TEMPERATURE_SCHEMA = sensor.sensor_schema(sensor.Sensor,
+    entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
+)
+
 DEVICE_STATUS_COMPRESSOR_FREQUENCY_SCHEMA = sensor.sensor_schema(sensor.Sensor,
     entity_category=cv.ENTITY_CATEGORY_DIAGNOSTIC
 )
@@ -133,6 +138,11 @@ DEVICE_STATUS_OPERATING_DEFAULT = DEVICE_STATUS_OPERATING_SCHEMA({
     CONF_NAME: "Device status operating"
 })
 
+DEVICE_STATUS_CURRENT_TEMPERATURE_DEFAULT = DEVICE_STATUS_CURRENT_TEMPERATURE_SCHEMA({
+    CONF_ID: "device_status_current_temperature",
+    CONF_NAME: "Device current temperature"
+})
+
 DEVICE_STATUS_COMPRESSOR_FREQUENCY_DEFAULT = DEVICE_STATUS_COMPRESSOR_FREQUENCY_SCHEMA({
     CONF_ID: "device_status_compressor_frequency",
     CONF_NAME: "Device status compressor frequency"
@@ -153,6 +163,7 @@ DEVICE_STATE_CONNECTED_DEFAULT[CONF_INTERNAL] = False
 DEVICE_STATE_ACTIVE_DEFAULT[CONF_INTERNAL] = False
 DEVICE_STATE_LAST_UPDATED_DEFAULT[CONF_INTERNAL] = False
 DEVICE_STATUS_OPERATING_DEFAULT[CONF_INTERNAL] = False
+DEVICE_STATUS_CURRENT_TEMPERATURE_DEFAULT[CONF_INTERNAL] = False
 DEVICE_STATUS_COMPRESSOR_FREQUENCY_DEFAULT[CONF_INTERNAL] = False
 DEVICE_STATUS_LAST_UPDATED_DEFAULT[CONF_INTERNAL] = False
 DEVICE_SET_POINT_DEFAULT[CONF_INTERNAL] = False
@@ -180,6 +191,7 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
         cv.Optional(CONF_DEVICE_STATE_ACTIVE, default=DEVICE_STATE_ACTIVE_DEFAULT): DEVICE_STATE_ACTIVE_SCHEMA,
         cv.Optional(CONF_DEVICE_STATE_LAST_UPDATED, default=DEVICE_STATE_LAST_UPDATED_DEFAULT): DEVICE_STATE_LAST_UPDATED_SCHEMA,
         cv.Optional(CONF_DEVICE_STATUS_OPERATING, default=DEVICE_STATUS_OPERATING_DEFAULT): DEVICE_STATUS_OPERATING_SCHEMA,
+        cv.Optional(CONF_DEVICE_STATUS_CURRENT_TEMPERATURE, default=DEVICE_STATUS_CURRENT_TEMPERATURE_DEFAULT): DEVICE_STATUS_CURRENT_TEMPERATURE_SCHEMA,
         cv.Optional(CONF_DEVICE_STATUS_COMPRESSOR_FREQUENCY, default=DEVICE_STATUS_COMPRESSOR_FREQUENCY_DEFAULT): DEVICE_STATUS_COMPRESSOR_FREQUENCY_SCHEMA,
         cv.Optional(CONF_DEVICE_STATUS_LAST_UPDATED, default=DEVICE_STATUS_LAST_UPDATED_DEFAULT): DEVICE_STATUS_LAST_UPDATED_SCHEMA,
         cv.Optional(CONF_DEVICE_SET_POINT, default=DEVICE_SET_POINT_DEFAULT): DEVICE_SET_POINT_SCHEMA,
@@ -258,6 +270,7 @@ def to_code(config):
     yield binary_sensor.register_binary_sensor(var.device_state_active, config[CONF_DEVICE_STATE_ACTIVE])
     yield sensor.register_sensor(var.device_state_last_updated, config[CONF_DEVICE_STATE_LAST_UPDATED])
     yield binary_sensor.register_binary_sensor(var.device_status_operating, config[CONF_DEVICE_STATUS_OPERATING])
+    yield sensor.register_sensor(var.device_status_current_temperature, config[CONF_DEVICE_STATUS_CURRENT_TEMPERATURE])
     yield sensor.register_sensor(var.device_status_compressor_frequency, config[CONF_DEVICE_STATUS_COMPRESSOR_FREQUENCY])
     yield sensor.register_sensor(var.device_status_last_updated, config[CONF_DEVICE_STATUS_LAST_UPDATED])
     yield sensor.register_sensor(var.device_set_point, config[CONF_DEVICE_SET_POINT])

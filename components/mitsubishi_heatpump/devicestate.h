@@ -106,6 +106,7 @@ namespace devicestate {
       esphome::sensor::Sensor* device_set_point;
       esphome::sensor::Sensor* device_state_last_updated;
       esphome::binary_sensor::BinarySensor* device_status_operating;
+      esphome::sensor::Sensor* device_status_current_temperature;
       esphome::sensor::Sensor* device_status_compressor_frequency;
       esphome::sensor::Sensor* device_status_last_updated;
 
@@ -138,6 +139,7 @@ namespace devicestate {
         esphome::sensor::Sensor* device_set_point,
         esphome::sensor::Sensor* device_state_last_updated,
         esphome::binary_sensor::BinarySensor* device_status_operating,
+        esphome::sensor::Sensor* device_status_current_temperature,
         esphome::sensor::Sensor* device_status_compressor_frequency,
         esphome::sensor::Sensor* device_status_last_updated
       );
@@ -172,8 +174,12 @@ namespace devicestate {
       bool internalTurnOn();
       bool internalTurnOff();
 
+      float getCurrentTemperature();
+
+      float getTargetTemperature();
+      void setTargetTemperature(float target);
+
       void setRemoteTemperature(float current);
-      void setTemperature(float target);
 
       void dump_state();
       void log_heatpump_settings(heatpumpSettings currentSettings);

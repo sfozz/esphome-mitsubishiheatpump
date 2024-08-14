@@ -1,29 +1,25 @@
 #include "devicestate.h"
 
 #include "espmhp.h"
+#include "floats.h"
 using namespace esphome;
 
 namespace devicestate {
     static const char* TAG = "DeviceStateManager"; // Logging tag
 
-    bool same_float(const float left, const float right, const float delta) {
-        return fabs(left - right) <= 0.001;
-    }
-
     bool deviceStatusEqual(DeviceStatus left, DeviceStatus right) {
         return left.operating == right.operating &&
-        same_float(left.currentTemperature, right.currentTemperature, 0.1) &&
-        left.compressorFrequency == right.compressorFrequency;
+            devicestate::same_float(left.currentTemperature, right.currentTemperature, 0.1f);
     }
 
     bool deviceStateEqual(DeviceState left, DeviceState right) {
         return left.active == right.active &&
-        left.mode == right.mode &&
-        left.fanMode == right.fanMode &&
-        left.swingMode == right.swingMode &&
-        left.verticalSwingMode == right.verticalSwingMode &&
-        left.horizontalSwingMode == right.horizontalSwingMode &&
-        same_float(left.targetTemperature, right.targetTemperature, 0.1);
+            left.mode == right.mode &&
+            left.fanMode == right.fanMode &&
+            left.swingMode == right.swingMode &&
+            left.verticalSwingMode == right.verticalSwingMode &&
+            left.horizontalSwingMode == right.horizontalSwingMode &&
+            devicestate::same_float(left.targetTemperature, right.targetTemperature, 0.1f);
     }
 
     bool isDeviceActive(heatpumpSettings *currentSettings) {
@@ -235,6 +231,7 @@ namespace devicestate {
       esphome::sensor::Sensor* device_set_point,
       esphome::sensor::Sensor* device_state_last_updated,
       esphome::binary_sensor::BinarySensor* device_status_operating,
+      esphome::sensor::Sensor* device_status_current_temperature,
       esphome::sensor::Sensor* device_status_compressor_frequency,
       esphome::sensor::Sensor* device_status_last_updated
     ) {
@@ -247,6 +244,7 @@ namespace devicestate {
         this->device_set_point = device_set_point;
         this->device_state_last_updated = device_state_last_updated;
         this->device_status_operating = device_status_operating;
+        this->device_status_current_temperature = device_status_current_temperature;
         this->device_status_compressor_frequency = device_status_compressor_frequency;
         this->device_status_last_updated = device_status_last_updated;
 
@@ -307,7 +305,6 @@ namespace devicestate {
         }
         this->deviceState = deviceState;
 
-        //this->device_state_connected->publish_state(this->deviceState.connected);
         this->device_state_connected->publish_state(this->hp->isConnected());
         this->device_state_active->publish_state(this->deviceState.active);
         this->device_set_point->publish_state(this->deviceState.targetTemperature);
@@ -592,11 +589,27 @@ namespace devicestate {
         }
     }
 
-    void DeviceStateManager::setTemperature(float value) {
+    float DeviceStateManager::getCurrentTemperature() {
+        return this->deviceStatus.currentTemperature;
+    }
+
+    float DeviceStateManager::getTargetTemperature() {
+        return this->deviceState.targetTemperature;
+    }
+
+    void DeviceStateManager::setTargetTemperature(float value) {
+        if (devicestate::same_float(value, this->getTargetTemperature(), 0.01f)) {
+            return;
+        }
+
         this->hp->setTemperature(value);
     }
 
     void DeviceStateManager::setRemoteTemperature(float current) {
+        if (devicestate::same_float(current, this->getCurrentTemperature(), 0.01f)) {
+            return;
+        }
+
         this->hp->setRemoteTemperature(current);
     }
 
@@ -639,7 +652,7 @@ namespace devicestate {
         };
         */
         ESP_LOGI(TAG, "Heatpump Status");
-        ESP_LOGI(TAG, "  roomTemperature: %f", this->deviceStatus.currentTemperature);
+        ESP_LOGI(TAG, "  roomTemperature: %.2f", this->deviceStatus.currentTemperature);
         ESP_LOGI(TAG, "  operating: %s", TRUEFALSE(this->deviceStatus.operating));
         ESP_LOGI(TAG, "  compressorFrequency: %f", this->deviceStatus.compressorFrequency);
         

@@ -22,6 +22,7 @@
 using namespace esphome;
 
 #include "devicestate.h"
+#include "floats.h"
 using namespace devicestate;
 
 /**
@@ -43,6 +44,9 @@ MitsubishiHeatPump::MitsubishiHeatPump(
     device_state_active = new esphome::binary_sensor::BinarySensor();
     device_state_last_updated = new esphome::sensor::Sensor();
     device_status_operating = new esphome::binary_sensor::BinarySensor();
+    device_status_current_temperature = new esphome::sensor::Sensor();
+    device_status_current_temperature->set_unit_of_measurement("°C");
+    device_status_current_temperature->set_accuracy_decimals(1);
     device_status_compressor_frequency = new esphome::sensor::Sensor();
     device_status_compressor_frequency->set_device_class("frequency");
     device_status_last_updated = new esphome::sensor::Sensor();
@@ -271,7 +275,6 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
 
             if (has_mode){
                 if (cool_setpoint.has_value() && !has_temp) {
-                    this->dsm->setTemperature(cool_setpoint.value());
                     this->update_setpoint(cool_setpoint.value());
                 }
                 this->action = climate::CLIMATE_ACTION_IDLE;
@@ -284,7 +287,6 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
 
             if (has_mode){
                 if (heat_setpoint.has_value() && !has_temp) {
-                    this->dsm->setTemperature(heat_setpoint.value());
                     this->update_setpoint(heat_setpoint.value());
                 }
                 this->action = climate::CLIMATE_ACTION_IDLE;
@@ -306,7 +308,6 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
 
             if (has_mode){
                 if (auto_setpoint.has_value() && !has_temp) {
-                    this->dsm->setTemperature(auto_setpoint.value());
                     this->update_setpoint(auto_setpoint.value());
                 }
                 this->action = climate::CLIMATE_ACTION_IDLE;
@@ -338,7 +339,6 @@ void MitsubishiHeatPump::control(const climate::ClimateCall &call) {
             "control", "Sending target temp: %.1f",
             *call.get_target_temperature()
         );
-        this->dsm->setTemperature(*call.get_target_temperature());
         this->update_setpoint(*call.get_target_temperature());
         updated = true;
     }
@@ -438,15 +438,23 @@ void MitsubishiHeatPump::updateDevice() {
      */
     const DeviceState deviceState = this->dsm->getDeviceState();
     const DeviceStatus deviceStatus = this->dsm->getDeviceStatus();
-    if (devicestate::deviceStateEqual(this->lastDeviceState, deviceState) && devicestate::deviceStatusEqual(this->lastDeviceStatus, deviceStatus)) {
-        ESP_LOGD(TAG, "Skipping updateDevice due to no change");
+    if (devicestate::deviceStateEqual(this->lastDeviceState, deviceState) &&
+            devicestate::deviceStatusEqual(this->lastDeviceStatus, deviceStatus) &&
+            !this->remote_temperature_updated) {
+        ESP_LOGI(TAG, "Skipping updateDevice due to no change");
         return;
     }
     ESP_LOGI(TAG, "Running updateDevice...");
+    this->remote_temperature_updated = false;
     this->lastDeviceState = deviceState;
     this->lastDeviceStatus = deviceStatus;
 
-    this->current_temperature = deviceStatus.currentTemperature;
+    if (this->remote_temperature > 0) {
+        this->current_temperature = this->remote_temperature;
+    } else {
+        this->current_temperature = deviceStatus.currentTemperature;
+    }
+    ESP_LOGI(TAG, "Current device temperature: %.2f", this->current_temperature);
     this->operating_ = deviceStatus.operating;
 
     // We cannot use the internal state of the device initialize component state
@@ -640,7 +648,10 @@ void MitsubishiHeatPump::set_remote_temperature(float temp) {
         last_remote_temperature_sensor_update_.reset();
     }
 
+    this->remote_temperature_updated =
+        !devicestate::same_float(temp, this->remote_temperature, 0.001f);
     this->dsm->setRemoteTemperature(temp);
+    this->publish_state();
 }
 
 void MitsubishiHeatPump::ping() {
@@ -716,6 +727,7 @@ void MitsubishiHeatPump::setup() {
         this->device_set_point,
         this->device_state_last_updated,
         this->device_status_operating,
+        this->device_status_current_temperature,
         this->device_status_compressor_frequency,
         this->device_status_last_updated
     );
@@ -813,18 +825,15 @@ bool MitsubishiHeatPump::isComponentActive() {
     return this->mode != climate::CLIMATE_MODE_OFF;
 }
 
-bool MitsubishiHeatPump::same_float(const float left, const float right) {
-    return fabs(left - right) <= 0.001;
-}
-
 void MitsubishiHeatPump::update_setpoint(const float value) {
-    if (this->same_float(this->target_temperature, value)) {
+    if (devicestate::same_float(this->target_temperature, value, 0.01f)) {
         ESP_LOGD(TAG, "Target temp unchanged: current={%f} updated={%f}", this->target_temperature, value);
         return;
     }
 
     ESP_LOGI(TAG, "Target temp changing from %f to %f", this->target_temperature, value);
     this->target_temperature = value;
+    this->dsm->setTargetTemperature(value);
 }
 
 void MitsubishiHeatPump::run_workflows() {
