@@ -650,6 +650,9 @@ void MitsubishiHeatPump::set_remote_temperature(float temp) {
 
     this->remote_temperature_updated =
         !devicestate::same_float(temp, this->remote_temperature, 0.001f);
+    if (this->remote_temperature_updated) {
+        this->remote_temperature = temp;
+    }
     this->dsm->setRemoteTemperature(temp);
     this->publish_state();
 }
