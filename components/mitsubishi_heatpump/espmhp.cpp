@@ -450,8 +450,10 @@ void MitsubishiHeatPump::updateDevice() {
     this->lastDeviceStatus = deviceStatus;
 
     if (this->remote_temperature > 0) {
+        ESP_LOGI(TAG, "Current: Using remote temperature %.2f", this->remote_temperature);
         this->current_temperature = this->remote_temperature;
     } else {
+        ESP_LOGI(TAG, "Current: Using device temperature %.2f", deviceStatus.currentTemperature);
         this->current_temperature = deviceStatus.currentTemperature;
     }
     ESP_LOGI(TAG, "Current device temperature: %.2f", this->current_temperature);

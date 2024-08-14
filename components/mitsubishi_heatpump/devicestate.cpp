@@ -325,6 +325,7 @@ namespace devicestate {
         this->deviceStatus = devicestate::toDeviceStatus(&currentStatus);
 
         this->device_status_operating->publish_state(this->deviceStatus.operating);
+        this->device_status_current_temperature->publish_state(this->deviceStatus.currentTemperature);
         this->device_status_compressor_frequency->publish_state(this->deviceStatus.compressorFrequency);
 
         this->deviceStatusLastUpdated += 1;
