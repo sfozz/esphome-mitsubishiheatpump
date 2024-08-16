@@ -846,6 +846,7 @@ bool MitsubishiHeatPump::isComponentActive() {
 }
 
 void MitsubishiHeatPump::ensure_pid_target() {
+    ESP_LOGD(TAG, "Check PID Target: %.2f", this->pidController->getTarget());
     if (this->target_temperature < this->min_temp || this->target_temperature > this->max_temp) {
         return;
     }
@@ -880,16 +881,11 @@ void MitsubishiHeatPump::run_workflows() {
         return;
     }
 
-    ESP_LOGD(TAG, "Check PID Target: %.2f", this->pidController->getTarget());
     this->ensure_pid_target();
-    if (this->pidController->getTarget() < this->min_temp) {
-        ESP_LOGW(TAG, "Skipping run workflow due pid target 0.");
-        return;
-    }
 
     const float setPointCorrection = this->pidController->update(this->current_temperature);
     this->pid_set_point_correction->publish_state(setPointCorrection);
-    ESP_LOGD(TAG, "PIDController set point correction: %.2f", setPointCorrection);
+    ESP_LOGI(TAG, "PIDController set point correction: %.2f", setPointCorrection);
 
     const DeviceState deviceState = this->dsm->getDeviceState();
     this->device_state_active->publish_state(deviceState.active);
