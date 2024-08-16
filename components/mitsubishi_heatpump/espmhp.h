@@ -22,6 +22,7 @@
 #include "esphome/core/preferences.h"
 #include <chrono>
 
+#include "pidcontroller.h"
 #include "devicestate.h"
 
 #include "HeatPump.h"
@@ -49,6 +50,10 @@ static const float   ESPMHP_CURRENT_TEMPERATURE_STEP = 0.1; // temperature setti
 static const float hysterisisUnderOff = 0.25; // in degrees C
 static const float hysterisisOverOn = 0.25; // in degrees C
 
+static const float p = 0.005;
+static const float i = 0.0005;
+static const float d = 0.000;
+
 class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::climate::Climate {
     public:
 
@@ -72,6 +77,7 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         esphome::sensor::Sensor* device_status_current_temperature;
         esphome::sensor::Sensor* device_status_compressor_frequency;
         esphome::sensor::Sensor* device_status_last_updated;
+        esphome::sensor::Sensor* pid_set_point_correction;
         esphome::sensor::Sensor* device_set_point;
 
         // Print a banner with library information.
@@ -212,6 +218,9 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
 
         float min_temp;
         float max_temp;
+
+        PIDController *pidController;
+        void ensure_pid_target();
 };
 
 #endif
