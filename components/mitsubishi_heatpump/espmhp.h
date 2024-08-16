@@ -50,9 +50,10 @@ static const float   ESPMHP_CURRENT_TEMPERATURE_STEP = 0.1; // temperature setti
 static const float hysterisisUnderOff = 0.25; // in degrees C
 static const float hysterisisOverOn = 0.25; // in degrees C
 
-static const float p = 0.125;
-static const float i = 0.02;
-static const float d = 0.001;
+//P=4.09 I=0.058 D=3.38
+static const float p = 4.09;
+static const float i = 0.058;
+static const float d = 3.38;
 
 class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::climate::Climate {
     public:
