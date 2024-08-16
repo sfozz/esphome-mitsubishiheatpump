@@ -50,9 +50,6 @@ MitsubishiHeatPump::MitsubishiHeatPump(
     device_status_compressor_frequency = new esphome::sensor::Sensor();
     device_status_compressor_frequency->set_device_class("frequency");
     device_status_last_updated = new esphome::sensor::Sensor();
-    pid_set_point_correction = new esphome::sensor::Sensor();
-    pid_set_point_correction->set_unit_of_measurement("°C");
-    pid_set_point_correction->set_accuracy_decimals(1);
     device_set_point = new esphome::sensor::Sensor();
     device_set_point->set_unit_of_measurement("°C");
     device_set_point->set_accuracy_decimals(1);
@@ -462,8 +459,6 @@ void MitsubishiHeatPump::updateDevice() {
     ESP_LOGI(TAG, "Current device temperature: %.2f", this->current_temperature);
     this->operating_ = deviceStatus.operating;
 
-    this->ensure_pid_target();
-
     // We cannot use the internal state of the device initialize component state
     if (this->isComponentActive()) {
         switch (deviceState.mode) {
@@ -769,16 +764,6 @@ void MitsubishiHeatPump::setup() {
         this->max_temp = this->visual_max_temperature_override_.value();
     }
 
-     this->pidController = new PIDController(
-        p,
-        i,
-        d,
-        this->get_update_interval(),
-        (this->max_temp + this->min_temp) / 2.0, // Set target to mid point of min/max
-        this->min_temp,
-        this->max_temp
-    );
-
     // create various setpoint persistence:
     cool_storage = global_preferences->make_preference<uint8_t>(this->get_object_id_hash() + 1);
     heat_storage = global_preferences->make_preference<uint8_t>(this->get_object_id_hash() + 2);
@@ -845,20 +830,6 @@ bool MitsubishiHeatPump::isComponentActive() {
     return this->mode != climate::CLIMATE_MODE_OFF;
 }
 
-void MitsubishiHeatPump::ensure_pid_target() {
-    ESP_LOGD(TAG, "Check PID Target: %.2f", this->pidController->getTarget());
-    if (this->target_temperature < this->min_temp || this->target_temperature > this->max_temp) {
-        return;
-    }
-
-    if (devicestate::same_float(this->target_temperature, this->pidController->getTarget(), 0.001f)) {
-        return;
-    }
-
-    ESP_LOGI(TAG, "PID Target temp changing from %f to %f", this->pidController->getTarget(), this->target_temperature);
-    this->pidController->setTarget(this->target_temperature);
-}
-
 void MitsubishiHeatPump::update_setpoint(const float value) {
     if (devicestate::same_float(this->target_temperature, value, 0.01f)) {
         ESP_LOGD(TAG, "Target temp unchanged: current={%f} updated={%f}", this->target_temperature, value);
@@ -868,9 +839,6 @@ void MitsubishiHeatPump::update_setpoint(const float value) {
     ESP_LOGI(TAG, "Target temp changing from %f to %f", this->target_temperature, value);
     this->target_temperature = value;
     this->dsm->setTargetTemperature(value);
-
-    ESP_LOGI(TAG, "PID Target temp changing from %f to %f", this->pidController->getTarget(), value);
-    this->pidController->setTarget(this->target_temperature);
 }
 
 void MitsubishiHeatPump::run_workflows() {
@@ -880,12 +848,6 @@ void MitsubishiHeatPump::run_workflows() {
         ESP_LOGW(TAG, "Skipping run workflow due to inactive state.");
         return;
     }
-
-    this->ensure_pid_target();
-
-    const float setPointCorrection = this->pidController->update(this->current_temperature);
-    this->pid_set_point_correction->publish_state(setPointCorrection);
-    ESP_LOGI(TAG, "PIDController set point correction: %.2f", setPointCorrection);
 
     const DeviceState deviceState = this->dsm->getDeviceState();
     this->device_state_active->publish_state(deviceState.active);
