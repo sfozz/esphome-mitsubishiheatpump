@@ -53,6 +53,8 @@ def valid_uart(uart):
         uarts = ["UART0"]  # UART1 is tx-only
     elif CORE.is_esp32:
         uarts = ["UART0", "UART1", "UART2"]
+    elif CORE.is_rp2040:
+        uarts = ["UART0", "UART1"]
     else:
         raise NotImplementedError
 
