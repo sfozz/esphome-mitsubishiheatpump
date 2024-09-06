@@ -438,13 +438,12 @@ namespace devicestate {
         this->internal_power_on->publish_state(this->internalPowerOn);
     }
 
-    bool DeviceStateManager::shouldThrottle() {
-        const uint32_t end = esphome::millis();
+    bool DeviceStateManager::shouldThrottle(uint32_t end) {
         const int durationInMilliseconds = end - this->lastInternalPowerUpdate;
         const int durationInSeconds = durationInMilliseconds / 1000;
         const int remaining = 60 - durationInSeconds; 
         return remaining > 0;
-    }`
+    }
 
     bool DeviceStateManager::internalTurnOn() {
         if (!this->isInitialized()) {
@@ -454,7 +453,8 @@ namespace devicestate {
 
         const char* deviceMode = deviceModeToString(this->deviceState.mode);
 
-        if (this->shouldThrottle()) {
+        const uint32_t end = esphome::millis();
+        if (this->shouldThrottle(end)) {
             ESP_LOGD(TAG, "Throttling internal turn on: %i seconds remaining", remaining);
             return false;
         }
@@ -479,7 +479,8 @@ namespace devicestate {
             return false;
         }
 
-        if (this->shouldThrottle()) {
+        const uint32_t end = esphome::millis();
+        if (this->shouldThrottle(end)) {
             ESP_LOGD(TAG, "Throttling internal turn off: %i seconds remaining", remaining);
             return false;
         }
