@@ -171,6 +171,7 @@ namespace devicestate {
       void turnOn(DeviceMode mode);
       void turnOff();
 
+      bool shouldThrottle();
       bool internalTurnOn();
       bool internalTurnOff();
 

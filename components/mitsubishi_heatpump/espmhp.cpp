@@ -857,11 +857,15 @@ void MitsubishiHeatPump::run_workflows() {
     }
     switch(this->action) {
         case climate::CLIMATE_ACTION_HEATING: {
+            const float delta = this->current_temperature - deviceState.targetTemperature;
             if (!deviceState.active) {
+                if (-delta > (2 * hysterisisOverOn)) {
+                    ESP_LOGI(TAG, "Turn on while heating: delta={%f} current={%f} targetTemperature={%f}", delta, this->current_temperature, deviceState.targetTemperature);
+                    this->dsm->internalTurnOn();
+                }
                 return;
             }
 
-            const float delta = this->current_temperature - deviceState.targetTemperature;
             if (delta > hysterisisUnderOff) {
                 ESP_LOGI(TAG, "Turn off while heating: delta={%f} current={%f} targetTemperature={%f}", delta, this->current_temperature, deviceState.targetTemperature);
                 this->dsm->internalTurnOff();
@@ -870,11 +874,15 @@ void MitsubishiHeatPump::run_workflows() {
             break;
         }
         case climate::CLIMATE_ACTION_COOLING: {
+            const float delta = deviceState.targetTemperature - this->current_temperature;
             if (!deviceState.active) {
+                if (-delta > (2 * hysterisisOverOn)) {
+                    ESP_LOGI(TAG, "Turn on while cooling: delta={%f} current={%f} targetTemperature={%f}", delta, this->current_temperature, deviceState.targetTemperature);
+                    this->dsm->internalTurnOn();
+                }
                 return;
             }
 
-            const float delta = deviceState.targetTemperature - this->current_temperature;
             if (delta > hysterisisUnderOff) {
                 ESP_LOGI(TAG, "Turn off while cooling: delta={%f} current={%f} targetTemperature={%f}", delta, this->current_temperature, deviceState.targetTemperature);
                 this->dsm->internalTurnOff();
