@@ -25,6 +25,7 @@
 #include "devicestate.h"
 
 #include "HeatPump.h"
+#include <optional>
 
 #ifndef ESPMHP_H
 #define ESPMHP_H
