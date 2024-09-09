@@ -23,6 +23,7 @@
 #include <chrono>
 
 #include "HeatPump.h"
+#include <optional>
 
 #ifndef ESPMHP_H
 #define ESPMHP_H
