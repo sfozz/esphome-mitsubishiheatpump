@@ -53,6 +53,8 @@ def valid_uart(uart):
         uarts = ["UART0"]  # UART1 is tx-only
     elif CORE.is_esp32:
         uarts = ["UART0", "UART1", "UART2"]
+    elif CORE.is_rp2040:
+        uarts = ["UART0", "UART1"]
     else:
         raise NotImplementedError
 
@@ -98,7 +100,11 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
 
 @coroutine
 def to_code(config):
-    serial = HARDWARE_UART_TO_SERIAL[PLATFORM_ESP8266][config[CONF_HARDWARE_UART]]
+    if CORE.is_rp2040:
+        serial = HARDWARE_UART_TO_SERIAL[PLATFORM_RP2040][config[CONF_HARDWARE_UART]]
+    else:
+        Serial = HARDWARE_UART_TO_SERIAL[PLATFORM_ESP8266][config[CONF_HARDWARE_UART]]
+
     var = cg.new_Pvariable(config[CONF_ID], cg.RawExpression(f"&{serial}"))
 
     if CONF_BAUD_RATE in config:
