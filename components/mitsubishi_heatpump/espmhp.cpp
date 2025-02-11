@@ -682,14 +682,14 @@ void MitsubishiHeatPump::enforce_remote_temperature_sensor_timeout() {
 void MitsubishiHeatPump::setup() {
     // This will be called by App.setup()
     this->banner();
-    ESP_LOGCONFIG(TAG, "Setting up UART...");
+    ESP_LOGD(TAG, "Setting up UART...");
 
     if (!this->verify_serial()) {
         this->mark_failed();
         return;
     }
 
-    ESP_LOGCONFIG(TAG, "Initializing new HeatPump object.");
+    ESP_LOGD(TAG, "Initializing new HeatPump object.");
     this->hp = new HeatPump();
     this->current_temperature = NAN;
     this->target_temperature = NAN;
@@ -714,7 +714,7 @@ void MitsubishiHeatPump::setup() {
     hp->setPacketCallback(this->log_packet);    
 #endif
 
-    ESP_LOGCONFIG(
+    ESP_LOGD(
             TAG,
             "hw_serial(%p) is &Serial(%p)? %s",
             this->get_hw_serial_(),
@@ -722,12 +722,12 @@ void MitsubishiHeatPump::setup() {
             YESNO((void *)this->get_hw_serial_() == (void *)&Serial)
     );
 
-    ESP_LOGCONFIG(TAG, "Calling hp->connect(%p)", this->get_hw_serial_());
+    ESP_LOGD(TAG, "Calling hp->connect(%p)", this->get_hw_serial_());
     if (hp->connect(this->get_hw_serial_(), this->baud_, this->rx_pin_, this->tx_pin_)) {
         hp->sync();
     }
     else {
-        ESP_LOGCONFIG(
+        ESP_LOGE(
                 TAG,
                 "Connection to HeatPump failed."
                 " Marking MitsubishiHeatPump component as failed."
