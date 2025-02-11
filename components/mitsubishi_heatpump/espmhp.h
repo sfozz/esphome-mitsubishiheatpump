@@ -179,11 +179,11 @@ class MitsubishiHeatPump : public esphome::PollingComponent, public esphome::cli
         int tx_pin_ = -1;
         bool operating_ = false;
 
-        std::optional<std::chrono::duration<long long, std::ratio<60>>> remote_operating_timeout_;
-        std::optional<std::chrono::duration<long long, std::ratio<60>>> remote_idle_timeout_;
-        std::optional<std::chrono::duration<long long, std::ratio<60>>> remote_ping_timeout_;
-        std::optional<std::chrono::time_point<std::chrono::steady_clock>> last_remote_temperature_sensor_update_;
-        std::optional<std::chrono::time_point<std::chrono::steady_clock>> last_ping_request_;
+        esphome::optional<std::chrono::duration<long long, std::ratio<60>>> remote_operating_timeout_;
+        esphome::optional<std::chrono::duration<long long, std::ratio<60>>> remote_idle_timeout_;
+        esphome::optional<std::chrono::duration<long long, std::ratio<60>>> remote_ping_timeout_;
+        esphome::optional<std::chrono::time_point<std::chrono::steady_clock>> last_remote_temperature_sensor_update_;
+        esphome::optional<std::chrono::time_point<std::chrono::steady_clock>> last_ping_request_;
 };
 
 #endif
