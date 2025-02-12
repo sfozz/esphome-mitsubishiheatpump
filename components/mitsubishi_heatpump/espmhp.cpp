@@ -747,6 +747,14 @@ void MitsubishiHeatPump::setup() {
     auto_setpoint = load(auto_storage);
 
     this->dump_config();
+
+    ESP_LOGD(
+            TAG,
+            "hw_serial(%p) is &Serial(%p)? %s",
+            this->get_hw_serial_(),
+            &Serial,
+            YESNO((void *)this->get_hw_serial_() == (void *)&Serial)
+    );
 }
 
 /**
