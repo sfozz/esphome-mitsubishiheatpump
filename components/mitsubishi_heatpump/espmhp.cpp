@@ -681,6 +681,7 @@ void MitsubishiHeatPump::enforce_remote_temperature_sensor_timeout() {
 
 void MitsubishiHeatPump::setup() {
     // This will be called by App.setup()
+    esphome::delay(10);
     this->banner();
     ESP_LOGD(TAG, "Setting up UART...");
 
